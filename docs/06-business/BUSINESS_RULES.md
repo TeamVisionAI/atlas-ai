@@ -3508,7 +3508,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** IUL Policy Review / WhatsApp scheduling UX  
 **Depends on:** BR-219, BR-213, BR-212, BR-210, BR-209, BR-190, BR-157, BR-108  
 **Related:** BR-213 rules 6–7 (first-offer same-day earliest+latest and cross-date More) are superseded for the day-first funnel. In-flight threads already on daypart without `iulSelectedDate` keep the prior daypart/More path.  
-**Status:** Implemented — not merged  
+**Status:** Implemented  
 **Engine target:** `iulDayFirstScheduling`; `iulAdConversation` day ask; `schedulingAvailabilityReader` full-horizon expand; `iulSlotSelection` clock-only titles  
 **Tests:** `backend/test/iulDayFirstCompactSchedulingBr220.test.js`
 
@@ -3524,6 +3524,27 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 7. **Mode switch** — Qualified Office↔Zoom preserves qualification and restarts scheduling at day selection. Fresh incomplete qualification continues qualification (BR-219).
 8. **Booking** — Time selection reuses BR-219 exactly: proposed state → deferred ack if slow → one create → office/Zoom confirmation. No second booking path.
 9. **Boundaries** — Do not change IUL qualification, BR-219 timeout/deferred architecture, interactive slot ID prefix semantics, or recruiting booking. No production writes. No migration.
+
+---
+
+## BR-221 — IUL Scheduling Ownership, Day-Picker Delivery, and Information-Seeker Integrity
+
+**Implements:** After an IUL review is offered and the prospect accepts Zoom or Office, scheduling owns the thread until booked, cancelled, or explicitly abandoned. The day ask must deliver a WhatsApp day picker or a numbered fallback of the displayed page. Information seekers stay information seekers.  
+**Domain:** IUL Policy Review / WhatsApp scheduling ownership  
+**Depends on:** BR-220, BR-219, BR-213, BR-157  
+**Related:** BR-208–220 IUL suites; recruiting booking unchanged  
+**Status:** Implemented — not merged  
+**Engine target:** `iulSchedulingOwnership`; `iulAdConversation`; `iulDayFirstScheduling`; `schedulingAvailabilityReader`; `communicationHub` interactive fallback  
+**Tests:** `backend/test/iulSchedulingOwnershipDayPickerBr221.test.js`
+
+### Rules
+
+1. **Scheduling ownership** — Once applicable qualification/information is complete, a review has been offered, and the user selects Zoom or Office, Atlas stays in scheduling (meeting mode, day, daypart, slots, booking pending/failed) until the appointment is booked, the user exits, or booking is abandoned. Do not fall back to `nextDiscoveryAsk`, policy type, carrier, policy age, original purpose, documents, or generic discovery.
+2. **Information seeker ≠ policy owner** — “Busco información” / `IUL_STATUS_RESEARCH` must not invent active IUL, policy type, carrier, policy age, or documents just because the prospect accepts a review. Scheduling uses only facts required to book.
+3. **Day picker delivery** — “Perfecto. ¿Qué día le funciona mejor?” must include the WhatsApp interactive day list in the same outbound turn. Live calendar must be read for Zoom/Office and day-page turns (`expandFullHorizon`). If interactive cannot be sent, send the numbered fallback of the current page. Never send the naked question alone.
+4. **Day-selection recovery** — While `lastQuestionAsked=iul_ask_review_day`, accept interactive `IUL_DAY_YYYY-MM-DD`, numeric fallback, or a unique simple match to one displayed day (“viernes”, “viernes 4”, “el viernes”). Anything else re-offers the current day page. Do not interpret broadly. Do not enter discovery.
+5. **Mode switch** — During scheduling ownership, “Por Zoom” / “En la oficina” updates meeting mode, preserves qualification/information facts, and restarts at day selection. Applies to active-policy, information-seeker, and unsure prospects.
+6. **Boundaries** — Do not change BR-219 timeout/deferred booking, BR-220 compact-slot behavior, IUL qualification questions for fresh incomplete leads, or recruiting booking. No production writes. No migration.
 
 ---
 

@@ -45,6 +45,14 @@ function resolveWhatsAppReplyEntities(engineResult) {
   return { ...fromDecision, ...fromPlan };
 }
 
+function resolveDeliverableReplyText(replyText, engineResult) {
+  const entities = resolveWhatsAppReplyEntities(engineResult);
+  if (!entities.whatsappInteractive && entities.interactiveFallbackText) {
+    return String(entities.interactiveFallbackText).trim() || replyText;
+  }
+  return replyText;
+}
+
 /**
  * Business-rules gate before automated outbound delivery (BR-034 human ownership, workflow gate).
  * BR-124 — optional allowHandoffAck delivers genuine V2 escalate / schedule-recovery replies
@@ -277,10 +285,11 @@ async function deliverWhatsAppReply({
   }
 
   const replyEntities = resolveWhatsAppReplyEntities(engineResult);
+  const outboundText = resolveDeliverableReplyText(replyText, engineResult);
 
   const delivery = await whatsappOutboundPipeline.sendAndPersistWhatsAppMessage({
       to: normalized.phone,
-      message: replyText,
+      message: outboundText,
       actor: "ATLAS",
       intent: outboundIntent,
       organizationId: prospect?.organization_id || null,
@@ -289,7 +298,7 @@ async function deliverWhatsAppReply({
       templateVariables,
       inboundPhoneNumberId: normalized.phoneNumberId || null,
       interactive: replyEntities.whatsappInteractive || null,
-      interactiveFallbackText: replyEntities.interactiveFallbackText || replyText,
+      interactiveFallbackText: replyEntities.interactiveFallbackText || outboundText,
       inboundEvent: normalized,
       handlerPath: "communicationHub.deliverWhatsAppReply",
       prospectOverride: prospect
@@ -753,5 +762,6 @@ module.exports = {
   processNormalizedInboundMessage,
   processConversationAfterInbound,
   extractReplyText,
-  resolveWhatsAppReplyEntities
+  resolveWhatsAppReplyEntities,
+  resolveDeliverableReplyText
 };

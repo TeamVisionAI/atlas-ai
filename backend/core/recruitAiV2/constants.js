@@ -121,6 +121,8 @@ const INTENTS = Object.freeze({
   IUL_SELECT_OFFERED_SLOT: "iul_select_offered_slot",
   IUL_REQUEST_MORE_SLOTS: "iul_request_more_slots",
   IUL_REQUEST_MORE_DAYS: "iul_request_more_days",
+  /** BR-221 — unmatched day text while scheduling owns the thread. */
+  IUL_REOFFER_REVIEW_DAYS: "iul_reoffer_review_days",
   IUL_STALE_SLOT_SELECTION: "iul_stale_slot_selection",
   /** BR-219 — inbound while IUL booking is still pending. */
   IUL_BOOKING_PENDING: "iul_booking_pending",
@@ -385,6 +387,8 @@ const REASON_CODES = Object.freeze({
   IUL_CROSS_DATE_PAGE: "IUL_CROSS_DATE_PAGE",
   IUL_REVIEW_DAY_CAPTURED: "IUL_REVIEW_DAY_CAPTURED",
   IUL_DAY_FIRST_OFFERED: "IUL_DAY_FIRST_OFFERED",
+  IUL_DAY_OPTIONS_REOFFERED: "IUL_DAY_OPTIONS_REOFFERED",
+  IUL_DAY_FALLBACK_REQUIRED: "IUL_DAY_FALLBACK_REQUIRED",
   IUL_MORE_DAYS: "IUL_MORE_DAYS",
   IUL_COMPACT_SLOT_PAGE: "IUL_COMPACT_SLOT_PAGE",
   IUL_SAME_DAY_MORE: "IUL_SAME_DAY_MORE",
