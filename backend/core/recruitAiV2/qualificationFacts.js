@@ -272,17 +272,25 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
 
   // Negatives first while auth is pending — including mixed "sí, pero no tengo…".
   // Superficial affirmative tokens must never override negative meaning (BR-100).
+  // Implements BR-224 — pending-auth ITIN-only / bare "no tengo" / restated no.
   const noAuth =
     pendingAuth &&
     (/^(no|nope)([.!]?)$/i.test(raw.trim()) ||
-      /\b(no tengo (permiso|papeles)|todavia no tengo permiso|estoy esperando( el)? permiso|sin permiso|sin papeles)\b/.test(
+      /^(solo|only)(\s+un|\s+an?)?\s+itin([.!]?)?$/i.test(t) ||
+      /^itin(\s+only)?([.!]?)?$/i.test(t) ||
+      /^(no tengo)([.!]?)?$/i.test(t) ||
+      /^(ya\s+)?te (lo\s+)?dije que no([.!]?)?$/i.test(t) ||
+      /^i (only )?have (an? )?itin([.!]?)?$/i.test(t) ||
+      /^i don'?t have( (it|that|any|documents?|papers?))?([.!]?)?$/i.test(t) ||
+      /\bno tengo (permiso|papeles|documentos?|documentacion)\b/.test(t) ||
+      /\b(todavia no tengo permiso|estoy esperando( el)? permiso|sin permiso|sin papeles)\b/.test(
         t
       ) ||
-      /\b(i don'?t have (a )?work permit|i am not authorized to work( yet)?|i'?m not authorized to work( yet)?|not authorized( to work)?( yet)?)\b/.test(
+      /\b(i don'?t have (a )?(work permit|papers|documents?)|i am not authorized to work( yet)?|i'?m not authorized to work( yet)?|not authorized( to work)?( yet)?)\b/.test(
         t
       ) ||
       /\b(pero )?(no tengo|todavia no|estoy esperando)\b/.test(t) &&
-        /\b(permiso|papeles|autoriz)\b/.test(t) ||
+        /\b(permiso|papeles|autoriz|documentos?|documentacion|itin)\b/.test(t) ||
       /\b(but )?(i'?m |i am )?not authorized\b/.test(t));
   if (noAuth) {
     return WORK_AUTHORIZATION.NOT_AUTHORIZED;

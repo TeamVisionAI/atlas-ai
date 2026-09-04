@@ -472,12 +472,22 @@ async function completeInterview(prospect, profile, language, options = {}) {
   );
 
   if (!organizationId) {
+    const {
+      resolveTeamMemberPhrase,
+      capitalizePhrase
+    } = require("./recruitAiV2/tenantBranding");
+    const TeamMemberPhrase = capitalizePhrase(
+      resolveTeamMemberPhrase({
+        organizationId: null,
+        language: language === "es" ? "spanish" : "english"
+      })
+    );
     return {
       success: false,
       reply:
         language === "es"
-          ? "No pudimos confirmar tu entrevista en este momento. Un agente de Team Vision te ayudará pronto."
-          : "We couldn't confirm your interview right now. A Team Vision agent will help you shortly.",
+          ? `No pudimos confirmar tu entrevista en este momento. ${TeamMemberPhrase} te ayudará pronto.`
+          : `We couldn't confirm your interview right now. ${TeamMemberPhrase} will help you shortly.`,
       humanAssist: true,
       reason: "TENANT_ORGANIZATION_REQUIRED"
     };
@@ -1335,7 +1345,9 @@ async function handleSemanticMessage({
   if (rulesResult.escalation?.needsHumanCoordinator) {
     prospect.last_message = cleanMessage;
     await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
-    const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
+    const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language, {
+      organizationId: scopedOrganizationId
+    });
 
     const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");
     await escalateConversationToHumanAssist({
@@ -1432,10 +1444,20 @@ async function handleSemanticMessage({
     }
 
     if (!confirmedReply) {
+      const {
+        resolveTeamMemberPhrase,
+        capitalizePhrase
+      } = require("./recruitAiV2/tenantBranding");
+      const TeamMemberPhrase = capitalizePhrase(
+        resolveTeamMemberPhrase({
+          organizationId: scopedOrganizationId,
+          language: language === "es" ? "spanish" : "english"
+        })
+      );
       confirmedReply =
         language === "es"
-          ? "✅ Tu entrevista ya está confirmada. Un agente de Team Vision se comunicará contigo si es necesario realizar algún ajuste."
-          : "✅ Your interview is already confirmed. A Team Vision agent will contact you if any adjustment is needed.";
+          ? `✅ Tu entrevista ya está confirmada. ${TeamMemberPhrase} se comunicará contigo si es necesario realizar algún ajuste.`
+          : `✅ Your interview is already confirmed. ${TeamMemberPhrase} will contact you if any adjustment is needed.`;
     }
 
     await recordLog({
@@ -1482,7 +1504,9 @@ async function handleSemanticMessage({
 
   if (postSyncRules.escalation?.needsHumanCoordinator) {
     await syncProfileToProspect(prospect, profile, { language, captureState, message: cleanMessage, organizationId: scopedOrganizationId });
-    const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language);
+    const coordinatorReply = buildHumanCoordinatorReply("SPECIAL_MEETING_REQUEST", language, {
+      organizationId: scopedOrganizationId
+    });
 
     await recordLog({
       phone,
@@ -1537,7 +1561,8 @@ async function handleSemanticMessage({
     if (scheduleResult.humanHandoff) {
       const coordinatorReply = buildHumanCoordinatorReply(
         scheduleResult.handoffReason || "OUTSIDE_SCHEDULING_WINDOW",
-        language
+        language,
+        { organizationId: scopedOrganizationId }
       );
 
       const { escalateConversationToHumanAssist } = require("./appointmentHumanAssistBridge");

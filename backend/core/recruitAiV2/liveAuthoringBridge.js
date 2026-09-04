@@ -1189,6 +1189,15 @@ async function attemptLiveV2Authoring({
           rendered: renderCustomerReply({
             templateKey: "appointment_confirmed",
             language: lang,
+            organizationId:
+              v2Result.nextContext?.organizationId ||
+              v2Result.context?.organizationId ||
+              organizationId ||
+              null,
+            organizationName:
+              v2Result.nextContext?.organizationName ||
+              v2Result.context?.organizationName ||
+              null,
             entities: {
               dateLabel:
                 performed.dateKey ||

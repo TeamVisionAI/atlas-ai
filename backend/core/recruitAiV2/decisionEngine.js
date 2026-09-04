@@ -591,6 +591,8 @@ function buildBaseDecision({ context, interpretation }) {
       forbidInternalDiagnostics: true,
       templateKey: null,
       language: interpretation.preferredLanguage,
+      organizationId: context.organizationId || null,
+      organizationName: context.organizationName || null,
       entities: interpretation.entities || {}
     },
     contextPatch: {}

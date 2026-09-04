@@ -3,7 +3,7 @@
  * Prevents low-confidence extractions from overwriting confirmed canonical facts.
  */
 
-const { FACT_CERTAINTY } = require("./locationFacts");
+const { FACT_CERTAINTY, isNonLocationPhrase } = require("./locationFacts");
 
 const CERTAINTY_RANK = Object.freeze({
   [FACT_CERTAINTY.CONFIRMED]: 3,
@@ -36,9 +36,26 @@ function isConfirmedLocationFacts(facts = {}) {
   );
 }
 
+function incomingCityLooksNonLocation(interpretation = {}) {
+  const city = interpretation.entities?.city;
+  if (!city) {
+    return false;
+  }
+  const folded = String(city)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return isNonLocationPhrase(folded) || /^(tengo|itin)$/.test(folded);
+}
+
 function shouldBlockLocationOverwrite(existingFacts = {}, interpretation = {}) {
   if (!isConfirmedLocationFacts(existingFacts)) {
     return false;
+  }
+  // Implements BR-224 — never let a verb / ITIN token overwrite a confirmed city.
+  if (incomingCityLooksNonLocation(interpretation)) {
+    return true;
   }
   if (interpretation.intent === "correct_location") {
     return false;
