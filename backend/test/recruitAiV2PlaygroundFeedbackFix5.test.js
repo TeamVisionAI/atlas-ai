@@ -258,7 +258,8 @@ test("19. Orlando OUTSIDE + in-person request asks travel confirmation", () => {
   assert.equal(r.structuredDecision.decision.nextAction, "confirm_in_person_travel");
   assert.equal(r.nextContext.knownFacts.meetingTypeRequested, "in_person");
   assert.equal(r.nextContext.knownFacts.meetingTypeConfirmed, false);
-  assert.equal(r.nextContext.knownFacts.preferredMeetingType, "zoom");
+  assert.equal(r.nextContext.knownFacts.preferredMeetingType, "in_person");
+  assert.equal(r.nextContext.knownFacts.meetingPreferenceSource, "prospect_requested");
   assert.match(r.rendered.text, /Doral|2500 NW 79th/i);
 });
 

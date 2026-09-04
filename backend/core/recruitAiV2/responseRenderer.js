@@ -149,6 +149,8 @@ const COPY = Object.freeze({
       "Got it — we can do the interview in person. What time works best after {earliestTime}?",
     confirm_in_person_travel_doral:
       "Of course. Our office is in {officeCity}, at {officeAddress}. Does coming to {officeCity} work for you?",
+    confirm_in_person_travel_address_only:
+      "Of course. Our office is at {officeAddress}. Does coming to the office work for you?",
     confirm_in_person_travel_neutral:
       "Of course. We can do the interview in person at our office. Does coming to the office work for you?",
     acknowledge_cancel_no_write:
@@ -201,8 +203,7 @@ const COPY = Object.freeze({
     offer_available_slots: null,
     offer_nearest_alternatives: null,
     selected_slot_no_longer_available: null,
-    acknowledge_no_qualifying_availability:
-      "I don't have availability after {earliestTime} that day. What other day or time window works for you?",
+    acknowledge_no_qualifying_availability: null,
     clarify_am_pm: "Do you mean {ambiguousHour} in the morning or {ambiguousHour} in the afternoon/evening?",
     offer_alternatives_no_handoff:
       "That time may not be available. I can offer nearby options — what other time works for you?",
@@ -316,6 +317,8 @@ const COPY = Object.freeze({
       "Entendido — podemos hacer la entrevista en persona. ¿Qué hora te funciona después de las {earliestTime}?",
     confirm_in_person_travel_doral:
       "Claro. Nuestra oficina está en {officeCity}, en {officeAddress}. ¿Te funciona venir hasta {officeCity}?",
+    confirm_in_person_travel_address_only:
+      "Claro. Nuestra oficina está en {officeAddress}. ¿Te funciona venir a la oficina?",
     confirm_in_person_travel_neutral:
       "Claro. Podemos hacer la entrevista en persona en nuestra oficina. ¿Te funciona venir a la oficina?",
     acknowledge_cancel_no_write:
@@ -368,8 +371,7 @@ const COPY = Object.freeze({
     offer_available_slots: null,
     offer_nearest_alternatives: null,
     selected_slot_no_longer_available: null,
-    acknowledge_no_qualifying_availability:
-      "No tengo disponibilidad después de las {earliestTime} ese día. ¿Qué otro día o horario te funciona?",
+    acknowledge_no_qualifying_availability: null,
     clarify_am_pm:
       "¿Te refieres a las {ambiguousHour} de la mañana o a las {ambiguousHour} de la tarde?",
     offer_alternatives_no_handoff:
@@ -420,6 +422,171 @@ const STATE_DISPLAY = Object.freeze({
   TN: { en: "Tennessee", es: "Tennessee" },
   DC: { en: "District of Columbia", es: "Distrito de Columbia" }
 });
+
+function hasConcreteClock(value) {
+  if (value == null || value === "") {
+    return false;
+  }
+  const s = String(value).trim();
+  if (!s || s === "esa hora" || s === "that time") {
+    return false;
+  }
+  return /^\d{1,2}:\d{2}/.test(s);
+}
+
+function dayPartConstraintPhrase(dayPart, language) {
+  const part = String(dayPart || "").toLowerCase();
+  if (part === "morning") {
+    return language === LANGUAGES.SPANISH ? "en la mañana" : "in the morning";
+  }
+  if (part === "afternoon") {
+    return language === LANGUAGES.SPANISH ? "en la tarde" : "in the afternoon";
+  }
+  if (part === "evening") {
+    return language === LANGUAGES.SPANISH ? "en la noche" : "in the evening";
+  }
+  return "";
+}
+
+function uniqueOfferedDayKeys(offered = []) {
+  const keys = [];
+  for (const slot of offered) {
+    const key = slot?.date || slot?.dateKey;
+    if (key && !keys.includes(String(key))) {
+      keys.push(String(key));
+    }
+  }
+  return keys;
+}
+
+function joinDayPhrases(phrases, language) {
+  if (phrases.length <= 1) {
+    return phrases[0] || "";
+  }
+  if (language === LANGUAGES.SPANISH) {
+    if (phrases.length === 2) {
+      return `${phrases[0]} y ${phrases[1]}`;
+    }
+    return `${phrases.slice(0, -1).join(", ")} y ${phrases[phrases.length - 1]}`;
+  }
+  if (phrases.length === 2) {
+    return `${phrases[0]} and ${phrases[1]}`;
+  }
+  return `${phrases.slice(0, -1).join(", ")}, and ${phrases[phrases.length - 1]}`;
+}
+
+function composeDayFirstAvailability(language, entities = {}) {
+  const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
+  const dayOptions = {
+    now: entities.now || null,
+    timezone: entities.timezone || offered[0]?.timezone || null
+  };
+  const dayKeys = uniqueOfferedDayKeys(offered);
+  const phrases = dayKeys
+    .map((key) => formatSlotDayPhrase(key, language, dayOptions))
+    .filter(Boolean);
+  const part = dayPartConstraintPhrase(
+    entities.dayPart || entities.preferredDayPart,
+    language
+  );
+  const joined = joinDayPhrases(phrases, language);
+  if (!joined) {
+    return composeAskAvailableDay(language, entities);
+  }
+  if (language === LANGUAGES.SPANISH) {
+    return part
+      ? `Tengo disponible ${joined} ${part}. ¿Qué día te funciona?`
+      : `Tengo disponible ${joined}. ¿Qué día te funciona?`;
+  }
+  return part
+    ? `I have availability ${joined} ${part}. Which day works for you?`
+    : `I have availability ${joined}. Which day works for you?`;
+}
+
+function composeAskAvailableDay(language, entities = {}) {
+  const part = dayPartConstraintPhrase(
+    entities.dayPart || entities.preferredDayPart,
+    language
+  );
+  if (language === LANGUAGES.SPANISH) {
+    return part
+      ? `¿Qué día te funciona ${part}?`
+      : "¿Qué día te funciona?";
+  }
+  return part
+    ? `Which day works for you ${part}?`
+    : "Which day works for you?";
+}
+
+function composeNoQualifyingAvailability(language, entities = {}) {
+  const es = language === LANGUAGES.SPANISH;
+  const clock = hasConcreteClock(entities.earliestTime)
+    ? formatRequestedTime(entities.earliestTime, language)
+    : null;
+  const part = dayPartConstraintPhrase(
+    entities.dayPart || entities.preferredDayPart,
+    language
+  );
+  const dateLabel = entities.dateLabel;
+  const concreteDate =
+    dateLabel &&
+    dateLabel !== "ese día" &&
+    dateLabel !== "that day"
+      ? dateLabel
+      : null;
+
+  if (clock && concreteDate) {
+    return es
+      ? `No tengo disponibilidad después de las ${clock} el ${concreteDate}. ¿Qué otro día o horario te funciona?`
+      : `I don't have availability after ${clock} on ${concreteDate}. What other day or time window works for you?`;
+  }
+  if (clock && entities.rollingSearch) {
+    return es
+      ? `No tengo disponibilidad después de las ${clock} en los próximos días. ¿Te funcionaría en otro horario?`
+      : `I don't have availability after ${clock} in the coming days. Would a different time window work?`;
+  }
+  if (clock) {
+    return es
+      ? `No tengo disponibilidad después de las ${clock}. ¿Qué otro día o horario te funciona?`
+      : `I don't have availability after ${clock}. What other day or time window works for you?`;
+  }
+  if (part && entities.rollingSearch) {
+    return es
+      ? `No tengo disponibilidad ${part} en los próximos días. ¿Qué otro día o horario te funciona?`
+      : `I don't have availability ${part} in the coming days. What other day or time window works for you?`;
+  }
+  if (part) {
+    return es
+      ? `No tengo disponibilidad ${part}. ¿Qué otro día o horario te funciona?`
+      : `I don't have availability ${part}. What other day or time window works for you?`;
+  }
+  return es
+    ? "No tengo disponibilidad en los próximos días. ¿Qué otro día o horario te funciona?"
+    : "I don't have availability in the coming days. What other day or time window works for you?";
+}
+
+function composeInPersonTravelConfirm(language, officeCity, officeAddress) {
+  const es = language === LANGUAGES.SPANISH;
+  if (officeAddress && officeCity) {
+    return es
+      ? `Claro. Nuestra oficina está en ${officeCity}, en ${officeAddress}. ¿Te funciona venir hasta ${officeCity}?`
+      : `Of course. Our office is in ${officeCity}, at ${officeAddress}. Does coming to ${officeCity} work for you?`;
+  }
+  if (officeAddress) {
+    return es
+      ? `Claro. Nuestra oficina está en ${officeAddress}. ¿Te funciona venir a la oficina?`
+      : `Of course. Our office is at ${officeAddress}. Does coming to the office work for you?`;
+  }
+  return es
+    ? "Claro. Podemos hacer la entrevista en persona en nuestra oficina. ¿Te funciona venir a la oficina?"
+    : "Of course. We can do the interview in person at our office. Does coming to the office work for you?";
+}
+
+function composeOfficeHoursFaqAnswer(language) {
+  return language === LANGUAGES.SPANISH
+    ? "Atendemos entrevistas en la mañana y en la tarde."
+    : "We interview in the morning and in the afternoon.";
+}
 
 function formatRequestedTime(hhmm, language) {
   if (!hhmm) {
@@ -560,14 +727,36 @@ function resolveResumeQuestion(resumeTemplateKey, language, entities = {}, offic
     case "continue_qualification_after_location":
       return getAuthorizationQuestion(lang);
     case "continue_qualification_after_authorization": {
+      const meetingType = String(
+        entities.preferredMeetingType || entities.meetingType || ""
+      ).toLowerCase();
       const forceZoom =
-        String(entities.coverage || "").toUpperCase() === "OUTSIDE" ||
-        String(entities.preferredMeetingType || "").toLowerCase() === "zoom" ||
-        String(entities.meetingType || "").toLowerCase() === "zoom";
+        meetingType === "zoom" ||
+        (String(entities.coverage || "").toUpperCase() === "OUTSIDE" &&
+          meetingType !== "in_person");
       return forceZoom
         ? getOutsideZoomDayPartMessage(entities.city, lang)
         : getLocalOfficeDayPartMessage(lang, officeIdentity);
     }
+    case "confirm_in_person_travel":
+    case "confirm_in_person_travel_doral":
+    case "confirm_in_person_travel_address_only":
+    case "confirm_in_person_travel_neutral": {
+      const office = selectCustomerFacingOfficeAddress({
+        organizationId: entities.organizationId || officeIdentity.organizationId || null,
+        officeAddress: officeIdentity.officeAddress || entities.officeAddress || null,
+        officeAddressSource:
+          officeIdentity.officeAddressSource || entities.officeAddressSource || null
+      });
+      return composeInPersonTravelConfirm(
+        language,
+        extractOfficeCity(office.address) || "",
+        office.address || ""
+      );
+    }
+    case "ask_available_day":
+    case "ask_date":
+      return composeAskAvailableDay(language, entities);
     case "outside_zoom_day_part":
       return getOutsideZoomDayPartMessage(entities.city, lang);
     case "clarify_day_part":
@@ -652,11 +841,20 @@ function composeFaqThenResume(faqText, language, entities = {}, options = {}) {
       )
     );
   }
+  const meetingType = String(
+    entities.preferredMeetingType || entities.meetingType || ""
+  ).toLowerCase();
+  const officeIdentity = {
+    organizationId: entities.organizationId || null,
+    officeAddress: entities.officeAddress || null,
+    officeAddressSource: entities.officeAddressSource || null
+  };
   const resume =
-    resumeKey === "continue_qualification_after_authorization" ||
-    resumeKey === "outside_zoom_day_part"
+    (resumeKey === "continue_qualification_after_authorization" ||
+      resumeKey === "outside_zoom_day_part") &&
+    meetingType !== "in_person"
       ? getDayPartQuestion(localeCode(language))
-      : resolveResumeQuestion(resumeKey, language, entities);
+      : resolveResumeQuestion(resumeKey, language, entities, officeIdentity);
   return composeAnswerThenOneQuestion(faqText, resume);
 }
 
@@ -769,7 +967,12 @@ function renderCustomerReply(responsePlan) {
   };
 
   let template = pack[key];
-  if (key === "confirm_in_person_travel_doral" && !officeAddress) {
+  if (
+    key === "confirm_in_person_travel_doral" ||
+    key === "confirm_in_person_travel_address_only"
+  ) {
+    template = composeInPersonTravelConfirm(language, officeCity, officeAddress);
+  } else if (key === "confirm_in_person_travel_neutral" && !officeAddress) {
     template = pack.confirm_in_person_travel_neutral;
   } else if (
     key === "meeting_preference_in_person_office_confirm_slot" &&
@@ -830,6 +1033,15 @@ function renderCustomerReply(responsePlan) {
     template = composeJobOverviewThenResume(language, entities);
   } else if (key === "office_location_faq_then_resume") {
     template = composeOfficeLocationThenResume(language, entities);
+  } else if (key === "office_hours_faq_then_resume") {
+    template = composeFaqThenResume(
+      composeOfficeHoursFaqAnswer(language),
+      language,
+      entities,
+      { omitBridge: true }
+    );
+  } else if (key === "ask_available_day") {
+    template = composeAskAvailableDay(language, entities);
   } else if (key === "insurance_faq_then_resume") {
     template = composeFaqThenResume(
       getInsuranceFaqAnswer(lang),
@@ -1046,6 +1258,14 @@ function renderCustomerReply(responsePlan) {
 
   // Implements BR-107 / BR-108 — build offer copy from real offeredSlots only (never invent).
   if (key === "offer_available_slots" || key === "offer_nearest_alternatives") {
+    if (
+      entities.dayFirstOffer &&
+      !entities.requestedDate &&
+      Array.isArray(entities.offeredSlots) &&
+      entities.offeredSlots.length > 0
+    ) {
+      template = composeDayFirstAvailability(language, entities);
+    } else {
     const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
     const dayOptions = {
       now: entities.now || null,
@@ -1124,7 +1344,8 @@ function renderCustomerReply(responsePlan) {
           ? `${constraintPrefix || "Tengo disponible "}${offered[0] ? phrase : `a las ${phrase}`}. ¿Te funciona?`
           : `${constraintPrefix || "I have availability "}${offered[0] ? phrase : `at ${phrase}`}. Does that work for you?`;
     } else {
-      template = pack.acknowledge_no_qualifying_availability;
+      template = composeNoQualifyingAvailability(language, entities);
+    }
     }
   }
 
@@ -1152,16 +1373,12 @@ function renderCustomerReply(responsePlan) {
           ? `Ese horario ya no está disponible en este momento. Tengo disponible ${optionPhrases[0]}. ¿Te funciona?`
           : `That time is no longer available. I have ${optionPhrases[0]} available. Does that work for you?`;
     } else {
-      template = pack.acknowledge_no_qualifying_availability;
+      template = composeNoQualifyingAvailability(language, entities);
     }
   }
 
-  if (key === "acknowledge_no_qualifying_availability" && entities.rollingSearch) {
-    const earliestLabel = formatRequestedTime(entities.earliestTime || null, language);
-    template =
-      language === LANGUAGES.SPANISH
-        ? `No tengo disponibilidad después de las ${earliestLabel} en los próximos días. ¿Te funcionaría en otro horario?`
-        : `I don't have availability after ${earliestLabel} in the coming days. Would a different time window work?`;
+  if (key === "acknowledge_no_qualifying_availability") {
+    template = composeNoQualifyingAvailability(language, entities);
   }
 
   if (!template) {
@@ -1183,14 +1400,6 @@ function renderCustomerReply(responsePlan) {
     template = (pack.clarify_am_pm || "").replace(
       /\{ambiguousHour\}/g,
       ambiguousHour
-    );
-  } else if (
-    key === "acknowledge_no_qualifying_availability" &&
-    !entities.rollingSearch
-  ) {
-    template = (pack.acknowledge_no_qualifying_availability || "").replace(
-      /\{earliestTime\}/g,
-      earliestLabel
     );
   }
 

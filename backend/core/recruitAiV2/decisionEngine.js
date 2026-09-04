@@ -23,6 +23,8 @@ const {
   looksLikeJobOpportunityQuestion,
   looksLikeOfficeLocationQuestion,
   looksLikeNearbyLocationPreference,
+  looksLikeOfficeHoursQuestion,
+  looksLikeAvailableDaysQuestion,
   looksLikeClarifiableNonresponsiveInput
 } = require("./conversationContinuity");
 const { isBareConversationalYes } = require("../languageLibrary");
@@ -172,12 +174,197 @@ function applyMissedOfficeLocationFaq(structured, context, interpretation) {
   return true;
 }
 
+function applyMissedOfficeHoursFaq(structured, context, interpretation) {
+  const text = inboundTextFromInterpretation(interpretation);
+  if (
+    interpretation?.intent !== INTENTS.OFFICE_HOURS_QUESTION &&
+    !looksLikeOfficeHoursQuestion(text)
+  ) {
+    return false;
+  }
+  applyOfficeHoursResume(structured, context, interpretation);
+  return true;
+}
+
+function applyOfficeHoursResume(structured, context, interpretation) {
+  buildFaqResumeDecision(
+    structured,
+    context,
+    INTENTS.OFFICE_HOURS_QUESTION,
+    "office_hours_faq_then_resume",
+    interpretation
+  );
+  const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+  if (lastQ === "confirm_in_person_travel") {
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      resumeTemplateKey: "confirm_in_person_travel_doral",
+      preferredMeetingType: "in_person",
+      meetingType: "in_person"
+    };
+    structured.contextPatch = {
+      ...(structured.contextPatch || {}),
+      knownFacts: {
+        ...((structured.contextPatch && structured.contextPatch.knownFacts) || {}),
+        meetingTypeRequested: "in_person",
+        preferredMeetingType:
+          context.knownFacts?.preferredMeetingType === "zoom"
+            ? "in_person"
+            : context.knownFacts?.preferredMeetingType || "in_person",
+        meetingPreferenceSource:
+          context.knownFacts?.meetingPreferenceSource || "prospect_requested"
+      },
+      conversation: {
+        ...((structured.contextPatch && structured.contextPatch.conversation) || {}),
+        lastQuestionAsked: "confirm_in_person_travel",
+        pendingClarification: "confirm_in_person_travel"
+      }
+    };
+  }
+  structured.decision.nextAction = NEXT_ACTIONS.ANSWER_OFFICE_HOURS_THEN_RESUME;
+  structured.decision.shouldEscalate = false;
+  structured.reasonCodes.push(REASON_CODES.OFFICE_HOURS_FAQ);
+  structured.reasonCodes.push(REASON_CODES.FAQ_RESUME_NEXT_UNRESOLVED);
+  structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+}
+
+function applyMissedAvailableDaysAsk(structured, context, interpretation, availability) {
+  const text = inboundTextFromInterpretation(interpretation);
+  if (
+    interpretation?.intent !== INTENTS.REQUEST_AVAILABLE_DAYS &&
+    !looksLikeAvailableDaysQuestion(text)
+  ) {
+    return false;
+  }
+  const offered = applyAvailableDaysOffer({
+    structured,
+    context,
+    interpretation,
+    availability
+  });
+  return Boolean(offered);
+}
+
+function hasConcreteRequestedClock(context, interpretation) {
+  const value =
+    interpretation?.entities?.requestedTime ||
+    context?.appointment?.proposedTime ||
+    null;
+  return /^\d{1,2}:\d{2}/.test(String(value || ""));
+}
+
+function shouldOfferDaysFirst(context, interpretation) {
+  if (context?.appointment?.proposedDate) {
+    return false;
+  }
+  if (hasConcreteRequestedClock(context, interpretation)) {
+    return false;
+  }
+  const earliest =
+    interpretation?.entities?.availabilityConstraint?.earliestTime ||
+    context?.knownFacts?.availabilityConstraint?.earliestTime ||
+    null;
+  if (/^\d{1,2}:\d{2}/.test(String(earliest || ""))) {
+    return false;
+  }
+  const intent = interpretation?.intent;
+  if (
+    intent === INTENTS.REQUEST_AVAILABLE_DAYS ||
+    interpretation?.entities?.requestsAvailableDays
+  ) {
+    return true;
+  }
+  return intent === INTENTS.PROVIDE_DAY_PART;
+}
+
+function applyAvailableDaysOffer({
+  structured,
+  context,
+  interpretation,
+  availability
+}) {
+  const dayPart =
+    interpretation?.entities?.dayPart ||
+    context.knownFacts?.preferredDayPart ||
+    null;
+  const constraintPatch = {
+    knownFacts: {
+      preferredDayPart: dayPart || context.knownFacts?.preferredDayPart || null,
+      availabilityConstraint: dayPart
+        ? {
+            type: "availability_constraint",
+            dayPart,
+            earliestTime: null,
+            latestTime: null,
+            earliestTimeInclusive: true,
+            raw: interpretation?.entities?.rawText || null
+          }
+        : context.knownFacts?.availabilityConstraint || null
+    },
+    conversation: {
+      lastProspectIntent:
+        interpretation?.intent || INTENTS.REQUEST_AVAILABLE_DAYS
+    },
+    currentStage: STAGES.SCHEDULING
+  };
+  const offered = tryApplyAvailabilityOffer({
+    structured,
+    context,
+    interpretation,
+    availability,
+    constraintPatch
+  });
+  if (offered) {
+    offered.reasonCodes.push(REASON_CODES.DAY_FIRST_AVAILABILITY_OFFERED);
+    offered.reasonCodes.push(REASON_CODES.NO_STALE_TIME_FALLBACK);
+    offered.reasonCodes.push(REASON_CODES.NO_DEAD_END_CONTINUATION);
+    if (offered.customerReplyPlan) {
+      offered.customerReplyPlan.entities = {
+        ...offered.customerReplyPlan.entities,
+        dayFirstOffer: shouldOfferDaysFirst(context, interpretation),
+        dayPart,
+        preferredDayPart: dayPart
+      };
+    }
+    return offered;
+  }
+  structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_DAY_PART_ASK_TIME;
+  structured.decision.shouldEscalate = false;
+  structured.decision.mayCreateAppointment = false;
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey = "ask_available_day";
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    dayPart,
+    preferredDayPart: dayPart,
+    dayFirstOffer: true
+  };
+  structured.reasonCodes.push(REASON_CODES.DAY_FIRST_AVAILABILITY_OFFERED);
+  structured.reasonCodes.push(REASON_CODES.NO_STALE_TIME_FALLBACK);
+  structured.contextPatch = {
+    ...constraintPatch,
+    conversation: {
+      ...constraintPatch.conversation,
+      lastQuestionAsked: "ask_date",
+      pendingClarification: null,
+      clarificationCount: 0
+    }
+  };
+  return structured;
+}
+
 /** Implements BR-229 — do not emit generic pending-data copy for known continuity. */
-function applyPendingContinuityInsteadOfClarify(structured, context, interpretation) {
+function applyPendingContinuityInsteadOfClarify(structured, context, interpretation, availability) {
   if (applyMissedJobFaq(structured, context, interpretation)) {
     return true;
   }
   if (applyMissedOfficeLocationFaq(structured, context, interpretation)) {
+    return true;
+  }
+  if (applyMissedOfficeHoursFaq(structured, context, interpretation)) {
+    return true;
+  }
+  if (applyMissedAvailableDaysAsk(structured, context, interpretation, availability)) {
     return true;
   }
   const text = inboundTextFromInterpretation(interpretation);
@@ -503,23 +690,22 @@ function tryApplyAvailabilityOffer({
     interpretation?.entities?.availabilityConstraint?.earliestTime ||
     context.knownFacts?.availabilityConstraint?.earliestTime ||
     null;
+  const dayFirstOffer = shouldOfferDaysFirst(context, interpretation);
+  const proposedDate = dayFirstOffer
+    ? context.appointment?.proposedDate || null
+    : interpretation?.entities?.resolvedDate?.isoDate ||
+      context.appointment?.proposedDate ||
+      null;
   const dateLabel = resolveDateLabel(
     {
       ...context,
       appointment: {
         ...context.appointment,
-        proposedDate:
-          interpretation?.entities?.resolvedDate?.isoDate ||
-          context.appointment?.proposedDate ||
-          null
+        proposedDate
       }
     },
     structured.preferredLanguage || "spanish"
   );
-  const proposedDate =
-    interpretation?.entities?.resolvedDate?.isoDate ||
-    context.appointment?.proposedDate ||
-    null;
 
   // Read failed / missing agent / no date in reader → BR-105 fallback (caller continues).
   if (
@@ -541,11 +727,21 @@ function tryApplyAvailabilityOffer({
     structured.customerReplyPlan.templateKey = "acknowledge_no_qualifying_availability";
     structured.customerReplyPlan.entities = {
       ...structured.customerReplyPlan.entities,
-      earliestTime,
-      dateLabel,
+      earliestTime: earliestTime || null,
+      dateLabel: proposedDate ? dateLabel : null,
       requestedDate: proposedDate,
+      dayPart:
+        interpretation?.entities?.dayPart ||
+        context.knownFacts?.preferredDayPart ||
+        null,
+      preferredDayPart:
+        interpretation?.entities?.dayPart ||
+        context.knownFacts?.preferredDayPart ||
+        null,
+      dayFirstOffer: shouldOfferDaysFirst(context, interpretation),
       rollingSearch: rolling
     };
+    structured.reasonCodes.push(REASON_CODES.NO_STALE_TIME_FALLBACK);
     structured.reasonCodes.push(REASON_CODES.ZERO_QUALIFYING_SLOTS);
     structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
     if (rolling) {
@@ -657,8 +853,21 @@ function tryApplyAvailabilityOffer({
       nearestAlternatives: isNearest,
       todayUnavailableAfterLead: Boolean(availability.todayUnavailableAfterLead),
       now: context._testNow || null,
-      timezone: context.timezone || alternatives[0]?.timezone || null
+      timezone: context.timezone || alternatives[0]?.timezone || null,
+      dayFirstOffer,
+      dayPart:
+        interpretation?.entities?.dayPart ||
+        context.knownFacts?.preferredDayPart ||
+        null,
+      preferredDayPart:
+        interpretation?.entities?.dayPart ||
+        context.knownFacts?.preferredDayPart ||
+        null
     };
+    if (dayFirstOffer) {
+      structured.reasonCodes.push(REASON_CODES.DAY_FIRST_AVAILABILITY_OFFERED);
+      structured.reasonCodes.push(REASON_CODES.NO_STALE_TIME_FALLBACK);
+    }
     structured.reasonCodes.push(REASON_CODES.AVAILABLE_SLOTS_OFFERED);
     if (isNearest) {
       structured.reasonCodes.push(REASON_CODES.ZERO_QUALIFYING_SLOTS);
@@ -964,11 +1173,16 @@ function resolveMeetingModalityForLocation(facts = {}) {
     prior === "zoom" && (source === "prospect" || source === "prospect_confirmed");
 
   if (outside) {
-    if (source === "prospect_confirmed" && prior === "in_person") {
+    // Prospect-requested in-person must persist until they change modality.
+    // Do not silently snap back to Zoom after "puede ser presencial".
+    const prospectInPerson =
+      prior === "in_person" &&
+      (source === "prospect_confirmed" || source === "prospect_requested");
+    if (prospectInPerson) {
       return {
         coverage: "OUTSIDE",
         meetingType: "in_person",
-        meetingPreferenceSource: "prospect_confirmed",
+        meetingPreferenceSource: source,
         clearedStaleOffice: false
       };
     }
@@ -986,7 +1200,6 @@ function resolveMeetingModalityForLocation(facts = {}) {
       meetingPreferenceSource: "coverage_default",
       clearedStaleOffice:
         prior === "in_person" ||
-        source === "prospect_requested" ||
         facts.coverage === "LOCAL"
     };
   }
@@ -1121,6 +1334,16 @@ function resolvePendingResume(context) {
       entities: {
         requestedTime: context.appointment.proposedTime,
         dateLabel: resolveDateLabel(context, "spanish")
+      }
+    };
+  }
+  if (lastQ === "confirm_in_person_travel") {
+    return {
+      templateKey: "confirm_in_person_travel_doral",
+      lastQuestionAsked: "confirm_in_person_travel",
+      entities: {
+        preferredMeetingType: "in_person",
+        meetingType: "in_person"
       }
     };
   }
@@ -1560,6 +1783,20 @@ function decideConversationTurnCore({
     if (applyMissedOfficeLocationFaq(structured, context, interpretation)) {
       return structured;
     }
+  }
+
+  if (intent === INTENTS.OFFICE_HOURS_QUESTION) {
+    applyOfficeHoursResume(structured, context, interpretation);
+    return structured;
+  }
+
+  if (intent === INTENTS.REQUEST_AVAILABLE_DAYS) {
+    return applyAvailableDaysOffer({
+      structured,
+      context,
+      interpretation,
+      availability
+    });
   }
 
   if (
@@ -2684,8 +2921,7 @@ function decideConversationTurnCore({
         knownFacts: {
           meetingTypeRequested: "in_person",
           meetingTypeConfirmed: false,
-          // Keep active Zoom/OUTSIDE modality until travel confirmed.
-          preferredMeetingType: context.knownFacts?.preferredMeetingType || "zoom",
+          preferredMeetingType: "in_person",
           meetingPreferenceSource: "prospect_requested"
         },
         appointment: {
@@ -4050,7 +4286,7 @@ function decideConversationTurnCore({
     if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
       return structured;
     }
-    if (applyPendingContinuityInsteadOfClarify(structured, context, interpretation)) {
+    if (applyPendingContinuityInsteadOfClarify(structured, context, interpretation, availability)) {
       return structured;
     }
     structured.reasonCodes.push(REASON_CODES.RECOVERABLE_AMBIGUITY);
@@ -4058,6 +4294,8 @@ function decideConversationTurnCore({
     const continuityBlocksHandoff =
       looksLikeOfficeLocationQuestion(inboundText) ||
       looksLikeNearbyLocationPreference(inboundText) ||
+      looksLikeOfficeHoursQuestion(inboundText) ||
+      looksLikeAvailableDaysQuestion(inboundText) ||
       looksLikeJobOpportunityQuestion(inboundText);
     if (shouldEscalateAfterClarifications(context) && !continuityBlocksHandoff) {
       structured.decision.nextAction = NEXT_ACTIONS.ESCALATE_TO_HUMAN;
@@ -4118,7 +4356,7 @@ function decideConversationTurnCore({
   if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
     return structured;
   }
-  if (applyPendingContinuityInsteadOfClarify(structured, context, interpretation)) {
+  if (applyPendingContinuityInsteadOfClarify(structured, context, interpretation, availability)) {
     return structured;
   }
 

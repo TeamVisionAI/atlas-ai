@@ -768,6 +768,10 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL &&
     Boolean(interpretation?.entities?.requestsLaterAlternatives);
 
+  const availableDaysAsk =
+    intent === INTENTS.REQUEST_AVAILABLE_DAYS ||
+    Boolean(interpretation?.entities?.requestsAvailableDays);
+
   // Implements BR-164 — named day + persisted daypart searches that date only.
   const datedDayPartSearch =
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL &&
@@ -788,7 +792,8 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     !iulDayFirstNeedsSlots &&
     !laterAlternatives &&
     !datedDayPartSearch &&
-    !rescheduleDatedSearch
+    !rescheduleDatedSearch &&
+    !availableDaysAsk
   ) {
     return false;
   }
@@ -798,6 +803,7 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     intent === INTENTS.SCHEDULING_DATE_PROPOSAL ||
     intent === INTENTS.REASSERT_KNOWN_FACT ||
     intent === INTENTS.PROVIDE_DAY_PART ||
+    intent === INTENTS.REQUEST_AVAILABLE_DAYS ||
     intent === INTENTS.IUL_CHOOSE_REVIEW_DAY_PART ||
     intent === INTENTS.IUL_CHOOSE_MEETING_MODE ||
     intent === INTENTS.IUL_CHOOSE_REVIEW_DAY ||
@@ -807,7 +813,8 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     counterofferNeedsSlots ||
     datedDayPartSearch ||
     rescheduleDatedSearch ||
-    iulDayFirstNeedsSlots;
+    iulDayFirstNeedsSlots ||
+    availableDaysAsk;
   if (!allowedIntent) {
     return false;
   }
@@ -820,7 +827,8 @@ function shouldAttemptAvailabilityOffer({ context, interpretation } = {}) {
     dayPartNeedsSlots ||
     iulDayPartNeedsSlots ||
     iulDayFirstNeedsSlots ||
-    counterofferNeedsSlots
+    counterofferNeedsSlots ||
+    availableDaysAsk
   );
 }
 

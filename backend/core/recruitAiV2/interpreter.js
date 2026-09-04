@@ -26,6 +26,8 @@ const {
   looksLikeConversationClarificationRequest,
   looksLikeOfficeLocationQuestion,
   looksLikeNearbyLocationPreference,
+  looksLikeOfficeHoursQuestion,
+  looksLikeAvailableDaysQuestion,
   extractNearbyCityPreference,
   lastQuestionImpliesDate,
   lastQuestionImpliesDayPart: continuityImpliesDayPart
@@ -644,6 +646,12 @@ function shouldTreatAsDateOnlyProposal(schedule, text, context) {
       /\b(en la|por la|a la|in the)\s+manana\b/.test(t) ||
       /^(en la manana|por la manana|a la manana|in the morning|morning)$/.test(t);
 
+    // "en la mañana" is morning day-part, never tomorrow, unless the prospect
+    // is clearly picking a date from an offered menu.
+    if (explicitMorningFraming) {
+      return false;
+    }
+
     if (isPendingOfferedSlotContext(context) && !explicitMorningFraming) {
       return true;
     }
@@ -1044,6 +1052,31 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     if (authAnswer === true || authAnswer === false) {
       entities.workAuthorization = authAnswer;
     }
+  } else if (
+    looksLikeOfficeHoursQuestion(text) ||
+    looksLikeOfficeHoursQuestion(originalText)
+  ) {
+    // Implements BR-229 — office hours FAQ keeps scheduling / in-person state.
+    intent = INTENTS.OFFICE_HOURS_QUESTION;
+    confidence = 0.92;
+    entities.preserveKnownLocation = true;
+    if (authAnswer === true || authAnswer === false) {
+      entities.workAuthorization = authAnswer;
+    }
+  } else if (
+    looksLikeAvailableDaysQuestion(text) ||
+    looksLikeAvailableDaysQuestion(originalText)
+  ) {
+    // Implements BR-229 — "qué día puede ser" asks for real available days.
+    intent = INTENTS.REQUEST_AVAILABLE_DAYS;
+    confidence = 0.93;
+    const availableDayPart =
+      parseDayPart(text) || parseDayPart(originalText);
+    if (availableDayPart?.complete && availableDayPart.dayPart) {
+      entities.dayPart = availableDayPart.dayPart;
+      entities.completeness = "complete";
+    }
+    entities.requestsAvailableDays = true;
   } else if (
     looksLikeOfficeLocationQuestion(text) ||
     looksLikeOfficeLocationQuestion(originalText) ||

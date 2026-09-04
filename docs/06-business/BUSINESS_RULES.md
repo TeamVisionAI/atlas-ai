@@ -3622,14 +3622,14 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Depends on:** BR-018, BR-077, BR-146, BR-214, BR-224  
 **Related:** BR-226 tenant-scoped coverage geography  
 **Status:** Implemented — merged  
-**Engine target:** `officeAddressResolver.selectCustomerFacingOfficeAddress`; `teamVisionWorkflowCopy`; `responseRenderer`; `liveAuthoringBridge`; `recruitingWorkflowOrchestrator`; `manualInterviewReminderFallback`; `qrInterstitialBranding`  
-**Tests:** `backend/test/recruitAiV2TenantOfficeIdentityBr225.test.js`
+**Engine target:** `officeAddressResolver.selectCustomerFacingOfficeAddress`; `officeAddressResolver.extractOfficeCity`; `teamVisionWorkflowCopy`; `responseRenderer`; `liveAuthoringBridge`; `recruitingWorkflowOrchestrator`; `manualInterviewReminderFallback`; `qrInterstitialBranding`  
+**Tests:** `backend/test/recruitAiV2TenantOfficeIdentityBr225.test.js`; `backend/test/recruitAiV2VisionariesSchedulingContinuity.test.js`
 
 ### Rules
 
 1. **One office selector** — Customer-facing office copy uses `selectCustomerFacingOfficeAddress` over an already-resolved BR-077 identity. Do not add a third office resolver. `getOfficeLocation()` is Team Vision seed only.
 2. **Provenance** — Team Legacy (and any other tenant) must receive its Meeting Management / org office, recorded as `meeting_management` (or request / persisted appointment). Same street text as Team Vision is not proof of Team Vision fallback.
-3. **Fail closed** — A non-Team-Vision tenant with no complete office never inherits Doral / Team Vision Office. Use Zoom day-part or neutral in-person wording without an invented address.
+3. **Fail closed** — A non-Team-Vision tenant with no complete office never inherits Doral / Team Vision Office. Use Zoom day-part or neutral in-person wording without an invented address. If an office address exists but a friendly city label cannot be parsed, render the address only — never “Nuestra oficina está en , en …” or “venir hasta ?”. Do not invent a city name.
 4. **Facebook welcome** — Team Vision may say “Atlas de Team Vision”. Other tenants use a safe organization name or “Soy Atlas” / “I'm Atlas”. Never fall back to Team Vision.
 5. **Reminder contact** — Assigned interviewer name wins. Ana Perez is Team Vision seed default only.
 6. **QR interstitial** — Shared `/go` path defaults to Atlas. Team Vision display name only when the campaign org is the seed tenant or a safe override is supplied.
@@ -3669,8 +3669,8 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Depends on:** BR-088, BR-097, BR-131, BR-147, BR-155, BR-164, BR-195, BR-196  
 **Related:** BR-224 (work-auth / tenant handoff branding); BR-225 / BR-226 (tenant office / coverage); BR-227 (AI Quality evidence — do not depend)  
 **Status:** Implemented — merged  
-**Engine target:** `languageLibrary.isBareConversationalYes`; `qualificationFacts.parseWorkAuthorizationAnswer`; `conversationContinuity`; `interpreter`; `decisionEngine`; `responseRenderer`; `recruitingFirstTurnBurst`; `whatsappInboundPipeline`  
-**Tests:** `backend/test/recruitAiV2OffpathContinuityBr229.test.js`; `backend/test/recruitingFirstTurnBurstDedup.test.js`
+**Engine target:** `languageLibrary.isBareConversationalYes`; `qualificationFacts.parseWorkAuthorizationAnswer`; `conversationContinuity`; `interpreter`; `decisionEngine`; `responseRenderer`; `schedulingAvailabilityReader`; `recruitingFirstTurnBurst`; `whatsappInboundPipeline`  
+**Tests:** `backend/test/recruitAiV2OffpathContinuityBr229.test.js`; `backend/test/recruitingFirstTurnBurstDedup.test.js`; `backend/test/recruitAiV2VisionariesSchedulingContinuity.test.js`
 
 ### Rules
 
@@ -3681,6 +3681,8 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 5. **Generic pending-data fallback** — `clarify_once` is only for truly nonresponsive or unknown input. Valid pending answers, FAQs, objections, corrections, location preference, modality, scheduling, and clarification requests must take their dedicated path.
 6. **Tenant identity** — Handoff and office copy may say Team Vision only for the Team Vision seed tenant. Other tenants must not leak Team Vision branding or the Doral office address. Canonical branding is BR-224 `tenantBranding` / `organizationName`, not a string-strip workaround.
 7. **No contact-specific or tenant-only behavior hacks** — Shared Recruit V2 only. Do not enable semantic APPLY. AI Quality case emission for `DUPLICATE_GREETING` / `PENDING_ANSWER_REJECTED` / `FAQ_RESUME_FAILURE` / `PREMATURE_HANDOFF` is a follow-up (reason codes exist; BR-227 is not required).
+8. **Office / interview hours FAQ** — Phrases such as `a qué horas trabajas`, `qué horarios tienen`, `qué horas están allá`, and English equivalents are `OFFICE_HOURS_QUESTION`. Answer naturally, keep in-person / Zoom / day-part / last-question state, and resume the pending scheduling question. Never emit `clarify_once` for a recognized hours FAQ. An OUTSIDE prospect who requested in-person (`puede ser presencial`) keeps that modality until they change it; do not silently revert to Zoom.
+9. **Day-first when date is unknown** — If the prospect has only a day-part (`en la mañana`) or asks `Qué día puede ser` / `Qué días tienes` while date is unresolved, query real recruiting availability and offer available **days** first. Do not use “después de las esa hora ese día” or any “esa hora” / “ese día” wording unless an actual clock or day exists in scheduling state. Zero availability must name only the known constraint (morning / in-person / after a real time). Exact date+time booking and IUL day-first (BR-220) stay unchanged.
 
 ---
 

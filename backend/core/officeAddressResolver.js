@@ -238,13 +238,30 @@ function selectCustomerFacingOfficeAddress(input = {}) {
  * @returns {string|null}
  */
 function extractOfficeCity(address) {
+  const trimmed = String(address || "").trim();
+  if (!trimmed) {
+    return null;
+  }
+  const comma = trimmed.match(
+    /,\s*([^,]+),\s*[A-Za-z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i
+  );
+  if (comma) {
+    return comma[1].trim();
+  }
   if (!isCompleteOfficeAddress(address)) {
     return null;
   }
-  const match = String(address)
-    .trim()
-    .match(/,\s*([^,]+),\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/);
-  return match ? match[1].trim() : null;
+  const loose = trimmed.match(
+    /\b([A-Za-z][A-Za-z.'-]+)\s+[A-Za-z]{2}\s+\d{5}(?:-\d{4})?\s*$/
+  );
+  if (!loose) {
+    return null;
+  }
+  const city = loose[1].trim();
+  if (/^(suite|ste|unit|ave|avenue|st|street|blvd|rd|road|fl|floor)$/i.test(city)) {
+    return null;
+  }
+  return city;
 }
 
 function buildOfficeAddressDiagnostics(resolution = {}) {
