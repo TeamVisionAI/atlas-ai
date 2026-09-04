@@ -1257,9 +1257,14 @@ function renderCustomerReply(responsePlan) {
   }
 
   const zoomUrl = entities.zoomUrl || "";
+  const brandingIdentity = {
+    ...entities,
+    organizationId: responsePlan.organizationId || entities.organizationId || null,
+    organizationName: responsePlan.organizationName || entities.organizationName || null
+  };
   const teamMemberPhrase = resolveTeamMemberPhrase({
-    organizationId: responsePlan.organizationId || entities.organizationId,
-    organizationName: responsePlan.organizationName || entities.organizationName,
+    organizationId: brandingIdentity.organizationId,
+    organizationName: brandingIdentity.organizationName,
     language
   });
   const TeamMemberPhrase = capitalizePhrase(teamMemberPhrase);
@@ -1284,10 +1289,10 @@ function renderCustomerReply(responsePlan) {
   const fallback = applyTenantSafeTeamLabel(
     pack.safe_failure_escalate || pack.default,
     language,
-    entities
+    brandingIdentity
   );
   const sanitized = sanitizeCustomerCopy(
-    applyTenantSafeTeamLabel(rendered, language, entities),
+    applyTenantSafeTeamLabel(rendered, language, brandingIdentity),
     fallback
   );
   // Implements BR-102 — do not stack equivalent acknowledgements in one reply.

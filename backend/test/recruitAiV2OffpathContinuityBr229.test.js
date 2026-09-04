@@ -260,7 +260,7 @@ test("J) non-TV tenant escalate copy does not say Team Vision", () => {
     }
   });
   assert.doesNotMatch(rendered.text, /Team Vision/i);
-  assert.match(rendered.text, /compañero/i);
+  assert.match(rendered.text, /miembro de nuestro equipo/i);
 
   const tv = renderCustomerReply({
     templateKey: "safe_uncertain_escalate",
