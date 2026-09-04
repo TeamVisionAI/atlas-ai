@@ -44,6 +44,10 @@ const INTENTS = Object.freeze({
   JOB_OPPORTUNITY_QUESTION: "job_opportunity_question",
   /** BR-229 — office location / nearby-office preference (not a home-city correction). */
   OFFICE_LOCATION_QUESTION: "office_location_question",
+  /** BR-229 — office / interview hours FAQ. */
+  OFFICE_HOURS_QUESTION: "office_hours_question",
+  /** BR-229 — date-unresolved ask for actual available days. */
+  REQUEST_AVAILABLE_DAYS: "request_available_days",
   INSURANCE_QUESTION: "insurance_question",
   LICENSE_REQUIREMENT_QUESTION: "license_requirement_question",
   LICENSE_PATH_DETAIL_QUESTION: "license_path_detail_question",
@@ -150,6 +154,7 @@ const NEXT_ACTIONS = Object.freeze({
   ANSWER_BRIEF_VALUE_PROP_THEN_QUALIFY: "answer_brief_value_prop_then_qualify",
   ANSWER_JOB_OPPORTUNITY_THEN_RESUME: "answer_job_opportunity_then_resume",
   ANSWER_OFFICE_LOCATION_THEN_RESUME: "answer_office_location_then_resume",
+  ANSWER_OFFICE_HOURS_THEN_RESUME: "answer_office_hours_then_resume",
   ANSWER_INSURANCE_FAQ_THEN_RESUME: "answer_insurance_faq_then_resume",
   ANSWER_LICENSE_REQUIREMENT_THEN_RESUME: "answer_license_requirement_then_resume",
   ANSWER_LICENSE_PATH_DETAIL_THEN_RESUME: "answer_license_path_detail_then_resume",
@@ -345,6 +350,9 @@ const REASON_CODES = Object.freeze({
   CLEAN_WITHDRAWAL_CLOSURE: "CLEAN_WITHDRAWAL_CLOSURE",
   JOB_OPPORTUNITY_FAQ: "JOB_OPPORTUNITY_FAQ",
   OFFICE_LOCATION_FAQ: "OFFICE_LOCATION_FAQ",
+  OFFICE_HOURS_FAQ: "OFFICE_HOURS_FAQ",
+  DAY_FIRST_AVAILABILITY_OFFERED: "DAY_FIRST_AVAILABILITY_OFFERED",
+  NO_STALE_TIME_FALLBACK: "NO_STALE_TIME_FALLBACK",
   LOCATION_PREFERENCE_NOT_HANDOFF: "LOCATION_PREFERENCE_NOT_HANDOFF",
   DUPLICATE_GREETING: "DUPLICATE_GREETING",
   PENDING_ANSWER_REJECTED: "PENDING_ANSWER_REJECTED",

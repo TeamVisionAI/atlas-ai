@@ -338,6 +338,52 @@ function extractNearbyCityPreference(text) {
 }
 
 /**
+ * BR-229 — office / interview hours FAQ. Must not fall through to clarify_once
+ * or lose pending in-person / scheduling state.
+ */
+function looksLikeOfficeHoursQuestion(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return false;
+  }
+  return (
+    /\ba que horas?\b.{0,20}\b(trabajas|trabajan|estan|esta|abre|abren)\b/.test(
+      t
+    ) ||
+    /\bque horarios?\b.{0,24}\b(tienen|tiene|manejan|hay|estan)\b/.test(t) ||
+    /\bque horas\b.{0,20}\b(estan|esta|trabajan|trabajas|tienen|alla)\b/.test(
+      t
+    ) ||
+    /\bhorario(s)? de (la |las )?oficina\b/.test(t) ||
+    /\ba que hora\b.{0,16}\b(abren|abre|estan|esta|trabajan)\b/.test(t) ||
+    /\boffice hours\b/.test(t) ||
+    /\bwhat (hours|times) (do you|are you)\b/.test(t) ||
+    /\bwhat are your (hours|office hours|interview hours)\b/.test(t) ||
+    /\bwhen are you (open|there|available|in the office)\b/.test(t)
+  );
+}
+
+/**
+ * BR-229 — date-unresolved ask for actual available days
+ * ("Qué día puede ser", "Qué días tienes").
+ */
+function looksLikeAvailableDaysQuestion(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return false;
+  }
+  return (
+    /\bque dias?\b.{0,24}\b(puede|pueden|puede ser|tienes|tienen|hay|te funciona)\b/.test(
+      t
+    ) ||
+    /\b(cual|cuales)\s+dias?\b/.test(t) ||
+    /\bwhat days?\b.{0,20}\b(work|have|are available|can)\b/.test(t) ||
+    /\bwhich days?\b/.test(t) ||
+    /\bwhat day (can|works|is available)\b/.test(t)
+  );
+}
+
+/**
  * Generic "share the datum I just asked" fallback is only for nonresponsive input.
  */
 function looksLikeClarifiableNonresponsiveInput(text) {
@@ -353,6 +399,9 @@ function looksLikeClarifiableNonresponsiveInput(text) {
     return false;
   }
   if (looksLikeOfficeLocationQuestion(raw) || looksLikeNearbyLocationPreference(raw)) {
+    return false;
+  }
+  if (looksLikeOfficeHoursQuestion(raw) || looksLikeAvailableDaysQuestion(raw)) {
     return false;
   }
   if (looksLikeSpanishInfoRequest(raw) || looksLikeEnglishInfoRequest(raw)) {
@@ -607,6 +656,8 @@ module.exports = {
   looksLikeJobOpportunityQuestion,
   looksLikeOfficeLocationQuestion,
   looksLikeNearbyLocationPreference,
+  looksLikeOfficeHoursQuestion,
+  looksLikeAvailableDaysQuestion,
   extractNearbyCityPreference,
   looksLikeClarifiableNonresponsiveInput,
   looksLikeConversationClarificationRequest,

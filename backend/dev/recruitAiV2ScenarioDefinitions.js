@@ -1224,7 +1224,7 @@ const RECRUIT_AI_V2_SCENARIOS = [
         inboundMessageId: "sim-wamid.orlando-date.t01",
         expect: {
           intent: "provide_meeting_preference",
-          meetingType: "zoom",
+          meetingType: "in_person",
           meetingTypeRequested: "in_person",
           meetingTypeConfirmed: false,
           meetingPreferenceSource: "prospect_requested",
@@ -1451,7 +1451,7 @@ const RECRUIT_AI_V2_SCENARIOS = [
         inboundMessageId: "sim-wamid.sched-memory.t01",
         expect: {
           intent: "provide_meeting_preference",
-          meetingType: "zoom",
+          meetingType: "in_person",
           meetingTypeRequested: "in_person",
           meetingTypeConfirmed: false,
           proposedTime: "18:30",
