@@ -112,9 +112,15 @@ function isBareConversationalYes(text) {
   if (/\b(tengo|have|permiso|autoriz|licen|ciudadan|residente|papeles)\b/.test(t)) {
     return false;
   }
-  return /^(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro( que si)?|por supuesto|correcto|asi es|afirmativo|of course|thats right|that is right|affirmative)(\s+(senor|senora|senorita|senores|sir|maam|ma am|please))?$/.test(
-    t
-  );
+  // Implements BR-229 — stacked affirmatives ("si claro", "yes sure") are still yes.
+  // Do not match "si miami" / "yes orlando": every token must be a yes-atom or courtesy.
+  const yesAtom =
+    "(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro|por supuesto|correcto|asi es|afirmativo|of course|thats right|that is right|affirmative)";
+  const courtesy = "(senor|senora|senorita|senores|sir|maam|ma am|please)";
+  const tail = "(que si)";
+  return new RegExp(
+    `^${yesAtom}(\\s+(${yesAtom}|${tail}|${courtesy}))*$`
+  ).test(t);
 }
 
 function isNo(text) {

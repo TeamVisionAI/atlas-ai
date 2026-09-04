@@ -365,12 +365,23 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
   const yesTengoShorthand =
     pendingAuth &&
     !mentionsLicense(raw) &&
-    /^(si|yes|yep|yeah)[,:]?\s+(tengo|have)([.!]?)?$/i.test(raw.trim());
+    /^(si|yes|yep|yeah|claro)[,:]?\s+(tengo|have)(\s+(permiso|papeles|documentacion))?\s*[.!?]?$/i.test(
+      raw.trim()
+    );
+  // Implements BR-229 — pending ask_authorization stacked yes ("si claro")
+  // outranks FAQ/location leftovers. Unambiguous permit shorthand too.
+  const pendingPermitShorthand =
+    pendingAuth &&
+    !mentionsLicense(raw) &&
+    /^(si[,:]?\s+)?(tengo|cuento con)(\s+(permiso|papeles|documentacion))?([.!]?)?$/i.test(
+      raw.trim()
+    );
   const yesShort =
     pendingAuth &&
     !mentionsLicense(raw) &&
     (isBareConversationalYes(raw) ||
       yesTengoShorthand ||
+      pendingPermitShorthand ||
       (/^(si|yes).{0,40}\b(tengo|have|cuento con)\b/i.test(raw) &&
         mentionsWorkAuthorization(raw)));
   const patternYes =

@@ -123,7 +123,13 @@ const CITY_LOOKUP_ALIASES = Object.freeze({
   "ft. lauderdale": "fort lauderdale",
   "sunny isles": "sunny isles beach",
   pompano: "pompano beach",
-  bluftton: "bluffton"
+  bluftton: "bluffton",
+  // BR-229 — production WhatsApp typos for Hallandale / Hallandale Beach.
+  halandey: "hallandale",
+  hallandey: "hallandale",
+  halandale: "hallandale",
+  "halandale beach": "hallandale beach",
+  "hallandey beach": "hallandale beach"
 });
 
 /**

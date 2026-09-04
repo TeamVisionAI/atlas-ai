@@ -24,6 +24,9 @@ const {
   looksLikeEnglishInfoRequest,
   looksLikeCompanyIdentityQuestion,
   looksLikeConversationClarificationRequest,
+  looksLikeOfficeLocationQuestion,
+  looksLikeNearbyLocationPreference,
+  extractNearbyCityPreference,
   lastQuestionImpliesDate,
   lastQuestionImpliesDayPart: continuityImpliesDayPart
 } = require("./conversationContinuity");
@@ -1038,6 +1041,24 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       looksLikeEnglishInfoRequest(originalText)
         ? "overview"
         : "employment_framing";
+    if (authAnswer === true || authAnswer === false) {
+      entities.workAuthorization = authAnswer;
+    }
+  } else if (
+    looksLikeOfficeLocationQuestion(text) ||
+    looksLikeOfficeLocationQuestion(originalText) ||
+    looksLikeNearbyLocationPreference(text) ||
+    looksLikeNearbyLocationPreference(originalText)
+  ) {
+    // Implements BR-229 — office / nearby preference is not a home-city overwrite
+    // and must not fall through to clarify_once / premature handoff.
+    intent = INTENTS.OFFICE_LOCATION_QUESTION;
+    confidence = 0.91;
+    entities.nearbyCityPreference =
+      extractNearbyCityPreference(originalText || text) ||
+      extractNearbyCityPreference(text);
+    entities.locationPreferenceOnly = true;
+    entities.preserveKnownLocation = true;
     if (authAnswer === true || authAnswer === false) {
       entities.workAuthorization = authAnswer;
     }
