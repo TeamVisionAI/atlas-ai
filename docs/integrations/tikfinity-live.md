@@ -77,9 +77,12 @@ Unknown commands return `400`.
 
 ## Auth
 
+This endpoint is a public webhook. Atlas session, CSRF, and same-origin browser auth are not required. `TIKFINITY_WEBHOOK_SECRET` is the security boundary.
+
 - Missing or wrong secret → `401`
 - Secret is never written to structured logs
 - Access logs redact `secret=` query values
+- Browser-like TikFinity POSTs (Origin `https://tikfinity.zerody.one`) must reach the handler; they must not be rejected with a global origin `403`
 
 ## Tenant
 

@@ -10,7 +10,19 @@
  * never reaches the route.
  */
 
+const cors = require("cors");
 const { resolveAtlasEnv } = require("./atlasEnvironment");
+
+/** Exact public TikFinity webhook path. Do not treat as a prefix. */
+const TIKFINITY_LIVE_EVENT_PATH = "/api/integrations/tikfinity/live-event";
+
+function pathnameOnly(value) {
+  return String(value || "").split("?")[0];
+}
+
+function isTikfinityLiveEventPath(req = {}) {
+  return pathnameOnly(req.path || req.url) === TIKFINITY_LIVE_EVENT_PATH;
+}
 
 const DEFAULT_PRODUCTION_ORIGINS = Object.freeze([
   "https://teamvisionfinancial.com",
@@ -135,6 +147,11 @@ function createDisallowedOriginRejector(env = process.env) {
   }
 
   return function rejectDisallowedCorsOrigin(req, res, next) {
+    // Implements BR-230 — public TikFinity webhook is secret-authenticated,
+    // not Atlas-origin authenticated. Exact path only.
+    if (isTikfinityLiveEventPath(req)) {
+      return next();
+    }
     const origin = req.get("origin");
     if (isOriginAllowed(origin, env)) {
       return next();
@@ -143,12 +160,41 @@ function createDisallowedOriginRejector(env = process.env) {
   };
 }
 
+function buildTikfinityLiveEventCorsOptions() {
+  return {
+    origin: true,
+    credentials: false,
+    methods: ["GET", "HEAD", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Tikfinity-Secret"]
+  };
+}
+
+/**
+ * Production CORS stays allowlisted except the exact TikFinity LIVE webhook path,
+ * which is a public machine-to-machine endpoint authenticated by secret.
+ */
+function createAtlasCors(env = process.env) {
+  const defaultCors = cors(buildCorsOptions(env));
+  const tikfinityCors = cors(buildTikfinityLiveEventCorsOptions());
+
+  return function atlasCors(req, res, next) {
+    if (isTikfinityLiveEventPath(req)) {
+      return tikfinityCors(req, res, next);
+    }
+    return defaultCors(req, res, next);
+  };
+}
+
 module.exports = {
   DEFAULT_PRODUCTION_ORIGINS,
+  TIKFINITY_LIVE_EVENT_PATH,
   normalizeOrigin,
   buildAllowedOrigins,
   isAtlasOwnedVercelPreviewOrigin,
   isOriginAllowed,
+  isTikfinityLiveEventPath,
   buildCorsOptions,
+  buildTikfinityLiveEventCorsOptions,
+  createAtlasCors,
   createDisallowedOriginRejector
 };
