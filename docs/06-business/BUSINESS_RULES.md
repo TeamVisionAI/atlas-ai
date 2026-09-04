@@ -3665,7 +3665,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** Recruit AI v2 / WhatsApp inbound / qualification + scheduling continuity  
 **Depends on:** BR-088, BR-097, BR-131, BR-147, BR-155, BR-164, BR-195, BR-196  
 **Related:** BR-224 (work-auth / tenant handoff branding); BR-225 / BR-226 (tenant office / coverage); BR-227 (AI Quality evidence — do not depend)  
-**Status:** Implemented — not merged  
+**Status:** Implemented — merged  
 **Engine target:** `languageLibrary.isBareConversationalYes`; `qualificationFacts.parseWorkAuthorizationAnswer`; `conversationContinuity`; `interpreter`; `decisionEngine`; `responseRenderer`; `recruitingFirstTurnBurst`; `whatsappInboundPipeline`  
 **Tests:** `backend/test/recruitAiV2OffpathContinuityBr229.test.js`; `backend/test/recruitingFirstTurnBurstDedup.test.js`
 
@@ -3679,6 +3679,29 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 6. **Tenant identity** — Handoff and office copy may say Team Vision only for the Team Vision seed tenant. Other tenants must not leak Team Vision branding or the Doral office address. Canonical branding is BR-224 `tenantBranding` / `organizationName`, not a string-strip workaround.
 7. **No contact-specific or tenant-only behavior hacks** — Shared Recruit V2 only. Do not enable semantic APPLY. AI Quality case emission for `DUPLICATE_GREETING` / `PENDING_ANSWER_REJECTED` / `FAQ_RESUME_FAILURE` / `PREMATURE_HANDOFF` is a follow-up (reason codes exist; BR-227 is not required).
 
+---
+
+## BR-227 — AI Quality Evidence Integrity + Approval Safety
+
+**Implements:** AI Quality cases and learning proposals must be grounded in recoverable, review-safe conversation evidence. Generate Proposal may run on a weak case; Approve Regression cannot be recommended or persisted from catalog-only or empty evidence.  
+**Domain:** Platform / AI quality / learning loop  
+**Depends on:** BR-175, BR-198  
+**Related:** BR-049, BR-174  
+**Status:** Implemented — not merged  
+**Engine target:** `aiQualityService.loadConversationTurns`; `captureService`; `evidenceCompleteness`; `learningProposal`; `learningActions`  
+**Tests:** `backend/test/aiQualityEvidenceIntegrityBr227.test.js`; `frontend/src/pages/platform/aiQualityHelpers.test.js`
+
+### Rules
+
+1. **Bounded read-time context** — Case detail resolves conversation turns from `conversation_logs` by `organization_id` + `prospect_phone`. Select only columns that exist (`id`, `direction`, `created_at`, `intent`, `pipeline`, `current_step`, `language`). Do not query `prospect_id`, `message_type`, or `template_key`. Return last N turns around the case event. Do not copy raw WhatsApp bodies into the quality payload.
+2. **Observable lookup failure** — True no-result may be `[]`. Schema or query failure must surface `QUALITY_TURNS_LOOKUP_FAILED` on the case. Do not silently swallow it as empty turns.
+3. **Tenant isolation** — Prospect phone and logs are always scoped to the case organization. Tenant A cannot load tenant B turns.
+4. **Compact V2 interpretation** — Persist `compactInterpretation(observation.legacy || interpretation)` so conversation signals keep intent/language/facts/safety when semantic shadow is skipped. Do not persist chain-of-thought, hidden reasoning, scratchpads, or inbound text.
+5. **Owner** — `owner_user_id` uses the resolved acting/owner user when available.
+6. **Confidence ≠ missing** — `null` / `undefined` confidence is missing, not `0`. `Number(null)` must not become a reported score. Evidence completeness is a separate signal (`SUFFICIENT` / `PARTIAL` / `INSUFFICIENT`).
+7. **Approval gate** — Generate Proposal is allowed on insufficient evidence and must mark `INSUFFICIENT_EVIDENCE`. `recommended_action` must not be `approve_regression`. Approve Regression is rejected server-side. UI shows the reason and disables the action; UI disable is not sufficient by itself.
+8. **Historical cases** — Enrich turns at read time when phone correlation exists. Do not backfill production rows. Missing historical V2 interpretation stays null. Do not fabricate interpretation.
+9. **No autonomous learning** — Semantic APPLY stays OFF. No auto-edit of prompts, source, tests, or production behavior. No tenant-specific hardcoding. Team Legacy participation is unchanged by this rule.
 
 ---
 

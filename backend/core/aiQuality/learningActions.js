@@ -16,6 +16,8 @@ const {
 } = require("./constants");
 const { allowsPreAuthorization } = require("./riskPolicy");
 const { proposalRecord } = require("./learningProposal");
+const { assessEvidenceCompleteness } = require("./evidenceCompleteness");
+const { INSUFFICIENT_EVIDENCE_CODE, INSUFFICIENT_EVIDENCE_MESSAGE } = require("./constants");
 const {
   buildImplementationProposal,
   buildAuthorizedImplementationTask
@@ -136,6 +138,13 @@ async function applyLearningAction({
   } else if (action === LEARNING_ACTIONS.APPROVE_REGRESSION) {
     if (!proposal || proposal.status !== PROPOSAL_STATUSES.GENERATED) {
       fail("REGRESSION_APPROVAL_REQUIRED");
+    }
+    const evidence = assessEvidenceCompleteness(qualityCase);
+    if (!evidence.regressionApprovable) {
+      const error = new Error(INSUFFICIENT_EVIDENCE_MESSAGE);
+      error.statusCode = 409;
+      error.publicCode = INSUFFICIENT_EVIDENCE_CODE;
+      throw error;
     }
     const specBundle = buildRegressionCandidate({
       qualityCase: {

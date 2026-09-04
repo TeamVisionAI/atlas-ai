@@ -46,6 +46,7 @@ function buildCaseRow({
   signal,
   observation,
   context,
+  interpretation,
   structuredDecision,
   inboundMessageId
 }) {
@@ -53,7 +54,13 @@ function buildCaseRow({
     id: crypto.randomUUID(),
     organizationId,
     prospectId: prospectId || null,
-    ownerUserId: ownerUserId || null,
+    ownerUserId:
+      ownerUserId ||
+      context?.agentId ||
+      context?.ownerUserId ||
+      context?.prospectOwnerUserId ||
+      context?.identity?.ownerUserId ||
+      null,
     inboundMessageId: inboundMessageId || null,
     sourceEngine: SOURCE_ENGINES.RECRUIT_AI_V2_SEMANTIC,
     signalType: signal.type,
@@ -62,7 +69,8 @@ function buildCaseRow({
       prospectId,
       signalType: signal.type
     }),
-    legacyInterpretation: compactInterpretation(observation?.legacy),
+    // Implements BR-227 — keep compact V2 interpretation when semantic shadow is skipped.
+    legacyInterpretation: compactInterpretation(observation?.legacy || interpretation),
     semanticInterpretation: compactInterpretation(observation?.semantic),
     knownFactsBefore: summarizeFacts(context?.knownFacts),
     knownFactsAfter: summarizeFacts(context?.knownFacts),
@@ -135,6 +143,7 @@ async function captureFromSemanticShadow({
       signal,
       observation,
       context,
+      interpretation,
       structuredDecision,
       inboundMessageId
     });

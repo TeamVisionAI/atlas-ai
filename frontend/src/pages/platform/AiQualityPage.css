@@ -112,3 +112,18 @@
   background: #fef2f2;
   color: #b91c1c;
 }
+
+.ai-quality-evidence-warning {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.ai-quality-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

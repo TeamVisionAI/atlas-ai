@@ -9,7 +9,9 @@ import {
   casesForTab,
   doesNotExposeChainOfThought,
   formatPercent,
-  formatUsd
+  formatUsd,
+  isRegressionApprovable,
+  INSUFFICIENT_EVIDENCE_MESSAGE
 } from "./aiQualityHelpers.js";
 import { canAccessAiQualityPage } from "../../security/platformAccess.js";
 
@@ -53,6 +55,29 @@ test("case payloads must not expose hidden reasoning", () => {
     true
   );
   assert.equal(doesNotExposeChainOfThought({ chainOfThought: "secret" }), false);
+});
+
+test("Approve Regression is not approvable on insufficient evidence", () => {
+  assert.equal(
+    isRegressionApprovable({
+      evidenceStatus: "INSUFFICIENT",
+      regressionApprovable: false
+    }),
+    false
+  );
+  assert.equal(
+    isRegressionApprovable({
+      evidenceStatus: "SUFFICIENT",
+      regressionApprovable: true,
+      conversationTurns: [{ id: "t1" }]
+    }),
+    true
+  );
+  assert.match(INSUFFICIENT_EVIDENCE_MESSAGE, /Insufficient evidence to approve this regression/);
+  const page = fs.readFileSync(path.join(here, "AiQualityPage.jsx"), "utf8");
+  assert.match(page, /isRegressionApprovable/);
+  assert.match(page, /approve_regression/);
+  assert.match(page, /disabled=\{item\.id === "approve_regression"/);
 });
 
 test("only Super Admin can open AI Quality", () => {
