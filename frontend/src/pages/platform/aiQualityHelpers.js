@@ -70,7 +70,27 @@ export function casesForTab(cases, tab) {
   return rows;
 }
 
+export const INSUFFICIENT_EVIDENCE_MESSAGE =
+  "Insufficient evidence to approve this regression. Review conversation context or capture a future occurrence.";
+
+export function isRegressionApprovable(qualityCase) {
+  if (!qualityCase) {
+    return false;
+  }
+  if (qualityCase.regressionApprovable === false) {
+    return false;
+  }
+  if (qualityCase.evidenceStatus === "INSUFFICIENT") {
+    return false;
+  }
+  const proposal = qualityCase.learningProposal?.proposal || qualityCase.learningProposal;
+  if (proposal?.evidence_status === "INSUFFICIENT" || proposal?.regression_approvable === false) {
+    return false;
+  }
+  return true;
+}
+
 export function doesNotExposeChainOfThought(payload) {
   const text = JSON.stringify(payload || {});
-  return !/chainOfThought|chain_of_thought|hiddenReasoning/i.test(text);
+  return !/chainOfThought|chain_of_thought|hiddenReasoning|scratchpad|privateAnalysis/i.test(text);
 }

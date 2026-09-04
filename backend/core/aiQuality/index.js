@@ -7,7 +7,8 @@ const { captureFromSemanticShadow, compactInterpretation } = require("./captureS
 const { applyReviewAction, computeOverview } = require("./reviewService");
 const { createMemoryStore } = require("./memoryStore");
 const { syntheticCases, SYNTHETIC_ORG, OTHER_ORG } = require("./syntheticFixtures");
-const { buildLearningProposal, stripHiddenReasoning, containsHiddenReasoning } = require("./learningProposal");
+const { buildLearningProposal, stripHiddenReasoning, containsHiddenReasoning, scoreConfidence } = require("./learningProposal");
+const { assessEvidenceCompleteness } = require("./evidenceCompleteness");
 const { applyLearningAction } = require("./learningActions");
 const { buildLearningReport } = require("./learningReport");
 const { classifyRisk } = require("./riskPolicy");
@@ -29,6 +30,8 @@ module.exports = {
   SYNTHETIC_ORG,
   OTHER_ORG,
   buildLearningProposal,
+  scoreConfidence,
+  assessEvidenceCompleteness,
   stripHiddenReasoning,
   containsHiddenReasoning,
   applyLearningAction,

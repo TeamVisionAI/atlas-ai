@@ -7,10 +7,12 @@ const {
   SIGNAL_TYPES,
   LEARNING_ACTIONS,
   HIDDEN_REASONING_KEYS,
-  PROPOSAL_STATUSES
+  PROPOSAL_STATUSES,
+  EVIDENCE_STATUS
 } = require("./constants");
 const { classifyRisk } = require("./riskPolicy");
 const { summarizeFacts } = require("./regressionSpec");
+const { assessEvidenceCompleteness, reportedConfidence } = require("./evidenceCompleteness");
 
 const CATALOG = Object.freeze({
   [SIGNAL_TYPES.REPEATED_QUESTION]: {
@@ -132,10 +134,14 @@ function catalogFor(signalType) {
   return CATALOG[signalType] || DEFAULT_CATALOG;
 }
 
-function scoreConfidence(qualityCase = {}) {
-  const reported = Number(qualityCase.confidence);
-  if (Number.isFinite(reported)) {
+function scoreConfidence(qualityCase = {}, evidence = null) {
+  const reported = reportedConfidence(qualityCase.confidence);
+  if (reported != null) {
     return Math.max(0, Math.min(1, Math.round(reported * 100) / 100));
+  }
+  const status = evidence?.evidenceStatus || assessEvidenceCompleteness(qualityCase).evidenceStatus;
+  if (status === EVIDENCE_STATUS.INSUFFICIENT) {
+    return null;
   }
   const hasFacts = Boolean(
     qualityCase.knownFactsBefore && Object.values(qualityCase.knownFactsBefore).some((item) => item != null)
@@ -148,6 +154,11 @@ function buildLearningProposal(qualityCase = {}, overrides = {}) {
   const suggestedFixArea = overrides.suggested_fix_area || catalog.suggested_fix_area;
   const riskLevel = classifyRisk(qualityCase, suggestedFixArea);
   const expectedFromReview = qualityCase.expectedBehavior || {};
+  const evidence = assessEvidenceCompleteness(qualityCase);
+  const insufficient = evidence.evidenceStatus === EVIDENCE_STATUS.INSUFFICIENT;
+  const recommendedAction = insufficient
+    ? LEARNING_ACTIONS.REQUEST_REVISION
+    : overrides.recommended_action || catalog.recommended_action;
 
   const proposal = stripHiddenReasoning({
     problem_summary: overrides.problem_summary || catalog.problem_summary,
@@ -163,8 +174,14 @@ function buildLearningProposal(qualityCase = {}, overrides = {}) {
       .filter(Boolean),
     suggested_fix_area: suggestedFixArea,
     risk_level: riskLevel,
-    confidence: scoreConfidence(qualityCase),
-    recommended_action: overrides.recommended_action || catalog.recommended_action,
+    confidence: scoreConfidence(qualityCase, evidence),
+    recommended_action: recommendedAction,
+    evidence_status: evidence.evidenceStatus,
+    evidence_completeness: evidence.evidenceCompleteness,
+    evidence_factors: evidence.factors,
+    regression_approvable: evidence.regressionApprovable,
+    insufficient_evidence_code: evidence.insufficientEvidenceCode,
+    insufficient_evidence_message: evidence.insufficientEvidenceMessage,
     signal_type: qualityCase.signalType || null,
     case_id: qualityCase.id || null,
     organization_id: qualityCase.organizationId || null,
@@ -196,6 +213,7 @@ function proposalRecord({ qualityCase, actorUserId, overrides } = {}) {
     riskLevel: proposal.risk_level,
     confidence: proposal.confidence,
     recommendedAction: proposal.recommended_action,
+    evidenceStatus: proposal.evidence_status,
     generatedBy: "atlas_deterministic",
     createdByUserId: actorUserId || null,
     createdAt: now,
@@ -207,6 +225,7 @@ module.exports = {
   CATALOG,
   stripHiddenReasoning,
   containsHiddenReasoning,
+  scoreConfidence,
   buildLearningProposal,
   proposalRecord
 };

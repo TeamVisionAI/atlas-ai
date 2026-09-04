@@ -9,8 +9,129 @@ const { applyReviewAction, computeOverview } = require("../core/aiQuality/review
 const { applyLearningAction } = require("../core/aiQuality/learningActions");
 const { buildLearningReport } = require("../core/aiQuality/learningReport");
 const { resolvePlatformCaptureConfig, parseMode, clampSampleRate } = require("../core/aiQuality/captureConfig");
-const { AUDIT_ACTIONS, MODES } = require("../core/aiQuality/constants");
+const {
+  AUDIT_ACTIONS,
+  MODES,
+  CONVERSATION_TURN_LIMIT,
+  CONVERSATION_TURN_LOOKBACK
+} = require("../core/aiQuality/constants");
+const { assessEvidenceCompleteness } = require("../core/aiQuality/evidenceCompleteness");
 const { supabase } = require("./supabaseService");
+
+const CONVERSATION_TURN_COLUMNS = "id,direction,created_at,intent,pipeline,current_step,language";
+
+function turnsLookupError(cause) {
+  const error = new Error("QUALITY_TURNS_LOOKUP_FAILED");
+  error.statusCode = 500;
+  error.publicCode = "QUALITY_TURNS_LOOKUP_FAILED";
+  error.cause = cause;
+  return error;
+}
+
+function resolveTurnRole(row = {}) {
+  const direction = String(row.direction || "").toLowerCase();
+  if (direction === "incoming" || direction === "inbound") {
+    return "prospect";
+  }
+  const intent = String(row.intent || "").toUpperCase();
+  if (intent === "AGENT_ACTION" || intent.startsWith("HUMAN_")) {
+    return "agent";
+  }
+  return "atlas";
+}
+
+function mapConversationTurn(row) {
+  return {
+    id: row.id,
+    direction: row.direction || null,
+    role: resolveTurnRole(row),
+    createdAt: row.created_at || row.createdAt || null,
+    intent: row.intent || null,
+    pipeline: row.pipeline || null,
+    currentStep: row.current_step || row.currentStep || null,
+    language: row.language || null
+  };
+}
+
+function boundTurnsAround(turns, detectedAt, limit = CONVERSATION_TURN_LIMIT) {
+  const sorted = [...(turns || [])].sort(
+    (left, right) => new Date(left.createdAt || 0) - new Date(right.createdAt || 0)
+  );
+  if (!detectedAt || sorted.length <= limit) {
+    return sorted.slice(-limit);
+  }
+  const target = new Date(detectedAt).getTime();
+  let idx = sorted.findIndex((turn) => new Date(turn.createdAt || 0).getTime() > target);
+  if (idx < 0) {
+    idx = sorted.length;
+  }
+  const start = Math.max(0, idx - Math.ceil(limit * 0.75));
+  return sorted.slice(start, start + limit);
+}
+
+async function loadProspectPhone(prospectId, organizationId, { supabaseClient } = {}) {
+  if (!prospectId || !organizationId) {
+    return null;
+  }
+  const db = supabaseClient || supabase;
+  const { data, error } = await db
+    .from("prospects")
+    .select("id,phone,organization_id")
+    .eq("id", prospectId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error) {
+    throw turnsLookupError(error);
+  }
+  if (!data || String(data.organization_id) !== String(organizationId)) {
+    return null;
+  }
+  return data.phone || null;
+}
+
+async function loadConversationTurns(
+  prospectId,
+  organizationId,
+  qualityCase = {},
+  { supabaseClient, prospectPhone } = {}
+) {
+  if (!organizationId || !prospectId) {
+    return { turns: [], error: null };
+  }
+  try {
+    const phone = prospectPhone || (await loadProspectPhone(prospectId, organizationId, { supabaseClient }));
+    if (!phone) {
+      return { turns: [], error: null };
+    }
+    const db = supabaseClient || supabase;
+    const { data, error } = await db
+      .from("conversation_logs")
+      .select(CONVERSATION_TURN_COLUMNS)
+      .eq("organization_id", organizationId)
+      .eq("prospect_phone", phone)
+      .order("created_at", { ascending: false })
+      .limit(CONVERSATION_TURN_LOOKBACK);
+    if (error) {
+      throw turnsLookupError(error);
+    }
+    const mapped = (data || []).map(mapConversationTurn);
+    return {
+      turns: boundTurnsAround(mapped, qualityCase.detectedAt || qualityCase.detected_at),
+      error: null
+    };
+  } catch (error) {
+    if (error.publicCode === "QUALITY_TURNS_LOOKUP_FAILED") {
+      return {
+        turns: [],
+        error: {
+          code: error.publicCode,
+          message: "Conversation context could not be loaded."
+        }
+      };
+    }
+    throw error;
+  }
+}
 
 let defaultStore = null;
 
@@ -22,33 +143,6 @@ function getStore(store) {
     defaultStore = createSupabaseStore();
   }
   return defaultStore;
-}
-
-async function loadConversationTurns(prospectId, organizationId) {
-  if (!prospectId || !organizationId) {
-    return [];
-  }
-  try {
-    const { data, error } = await supabase
-      .from("conversation_logs")
-      .select("id,direction,created_at,message_type,template_key")
-      .eq("prospect_id", prospectId)
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .limit(8);
-    if (error) {
-      return [];
-    }
-    return (data || []).reverse().map((row) => ({
-      id: row.id,
-      direction: row.direction,
-      createdAt: row.created_at,
-      messageType: row.message_type || null,
-      templateKey: row.template_key || null
-    }));
-  } catch {
-    return [];
-  }
 }
 
 async function captureTurn(payload, { store, env } = {}) {
@@ -99,10 +193,18 @@ async function getCaseForScope({ caseId, organizationId = null, store, includeTu
     regression
   };
   if (!includeTurns) {
-    return withLearning;
+    const evidence = assessEvidenceCompleteness(withLearning);
+    return { ...withLearning, ...evidence };
   }
-  const turns = await loadConversationTurns(qualityCase.prospectId, qualityCase.organizationId);
-  return { ...withLearning, conversationTurns: turns };
+  const loaded = await loadConversationTurns(qualityCase.prospectId, qualityCase.organizationId, qualityCase, {
+    supabaseClient: store?.supabase || undefined
+  });
+  const withTurns = {
+    ...withLearning,
+    conversationTurns: loaded.turns,
+    conversationTurnsError: loaded.error
+  };
+  return { ...withTurns, ...assessEvidenceCompleteness(withTurns) };
 }
 
 async function reviewCase({
@@ -149,7 +251,12 @@ async function applyLearningCaseAction({
   store
 } = {}) {
   const resolved = getStore(store);
-  const qualityCase = await getCaseForScope({ caseId, organizationId, store: resolved });
+  const qualityCase = await getCaseForScope({
+    caseId,
+    organizationId,
+    store: resolved,
+    includeTurns: true
+  });
   if (!qualityCase) {
     const error = new Error("QUALITY_CASE_NOT_FOUND");
     error.statusCode = 404;
@@ -234,6 +341,9 @@ function presentPlatformSettings(env = process.env) {
 
 module.exports = {
   captureTurn,
+  loadConversationTurns,
+  CONVERSATION_TURN_COLUMNS,
+  boundTurnsAround,
   listCasesForScope,
   getCaseForScope,
   reviewCase,

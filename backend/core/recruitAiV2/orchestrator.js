@@ -917,7 +917,7 @@ async function processRecruitAiV2Turn({
     await capture({
       observation: semanticShadow,
       organizationId: organizationId || options.organizationId || loaded.organizationId || null,
-      actingUserId: options.actingUserId || null,
+      actingUserId: actingUserId || options.actingUserId || null,
       prospectId: options.legacyProspectId || prospectId || loaded.prospectId || null,
       inboundMessageId: options.inboundMessageId || null,
       inboundText: typeof message === "string" ? message : message?.text || "",

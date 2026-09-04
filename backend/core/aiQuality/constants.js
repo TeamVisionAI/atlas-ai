@@ -135,6 +135,18 @@ const RISK_LEVELS = Object.freeze({
   HIGH: "HIGH"
 });
 
+const EVIDENCE_STATUS = Object.freeze({
+  SUFFICIENT: "SUFFICIENT",
+  PARTIAL: "PARTIAL",
+  INSUFFICIENT: "INSUFFICIENT"
+});
+
+const INSUFFICIENT_EVIDENCE_CODE = "INSUFFICIENT_EVIDENCE";
+const INSUFFICIENT_EVIDENCE_MESSAGE =
+  "Insufficient evidence to approve this regression. Review conversation context or capture a future occurrence.";
+const CONVERSATION_TURN_LIMIT = 8;
+const CONVERSATION_TURN_LOOKBACK = 24;
+
 const AUDIT_ACTIONS = Object.freeze({
   PLATFORM_CAPTURE_TOGGLED: "ai_quality.platform_capture_toggled",
   TENANT_PARTICIPATION_UPDATED: "ai_quality.tenant_participation_updated",
@@ -184,6 +196,11 @@ module.exports = {
   IMPLEMENTATION_STATUSES,
   LEARNING_ACTIONS,
   RISK_LEVELS,
+  EVIDENCE_STATUS,
+  INSUFFICIENT_EVIDENCE_CODE,
+  INSUFFICIENT_EVIDENCE_MESSAGE,
+  CONVERSATION_TURN_LIMIT,
+  CONVERSATION_TURN_LOOKBACK,
   AUDIT_ACTIONS,
   HIDDEN_REASONING_KEYS,
   LOW_CONFIDENCE_THRESHOLD

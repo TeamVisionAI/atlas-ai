@@ -21,7 +21,9 @@ import {
   LEARNING_FOLLOW_UP_ACTIONS,
   casesForTab,
   formatPercent,
-  formatUsd
+  formatUsd,
+  isRegressionApprovable,
+  INSUFFICIENT_EVIDENCE_MESSAGE
 } from "./aiQualityHelpers";
 import "../identity/identity.css";
 import "./AiQualityPage.css";
@@ -111,26 +113,35 @@ export default function AiQualityPage() {
     if (!selected?.id) {
       return;
     }
-    const result = await applyAiQualityLearningAction(selected.id, {
-      action,
-      notes,
-      expectedBehavior: expectedIntent ? { expectedIntent } : {}
-    });
-    setSelected(result.qualityCase || selected);
-    if (result.proposal) {
-      setSelected((current) => ({
-        ...(result.qualityCase || current),
-        learningProposal: result.proposal,
-        implementationProposal: result.implementation || current?.implementationProposal,
-        regression: result.regression || current?.regression
-      }));
+    if (action === "approve_regression" && !isRegressionApprovable(selected)) {
+      setError(INSUFFICIENT_EVIDENCE_MESSAGE);
+      return;
     }
-    if (result.implementation?.markdown) {
-      setSpec(result.implementation.markdown);
-    } else if (result.regression?.markdown) {
-      setSpec(result.regression.markdown);
+    try {
+      const result = await applyAiQualityLearningAction(selected.id, {
+        action,
+        notes,
+        expectedBehavior: expectedIntent ? { expectedIntent } : {}
+      });
+      setError("");
+      setSelected(result.qualityCase || selected);
+      if (result.proposal) {
+        setSelected((current) => ({
+          ...(result.qualityCase || current),
+          learningProposal: result.proposal,
+          implementationProposal: result.implementation || current?.implementationProposal,
+          regression: result.regression || current?.regression
+        }));
+      }
+      if (result.implementation?.markdown) {
+        setSpec(result.implementation.markdown);
+      } else if (result.regression?.markdown) {
+        setSpec(result.regression.markdown);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err.message || INSUFFICIENT_EVIDENCE_MESSAGE);
     }
-    await refresh();
   }
 
   async function openRegression(id) {
@@ -322,7 +333,27 @@ export default function AiQualityPage() {
           <h2>Case detail</h2>
           <p>
             {selected.signalType} · {selected.status} · action {selected.atlasAction || "—"}
+            {selected.evidenceStatus ? ` · evidence ${selected.evidenceStatus}` : ""}
           </p>
+          {selected.evidenceStatus === "INSUFFICIENT" || !isRegressionApprovable(selected) ? (
+            <p className="ai-quality-evidence-warning" role="status">
+              {selected.insufficientEvidenceMessage || INSUFFICIENT_EVIDENCE_MESSAGE}
+            </p>
+          ) : null}
+          {selected.conversationTurnsError ? (
+            <p className="ai-quality-evidence-warning" role="alert">
+              Conversation context could not be loaded ({selected.conversationTurnsError.code}).
+            </p>
+          ) : null}
+          <div>
+            <strong>Evidence</strong>
+            <pre>{JSON.stringify({
+              status: selected.evidenceStatus || null,
+              completeness: selected.evidenceCompleteness ?? null,
+              regressionApprovable: selected.regressionApprovable !== false,
+              factors: selected.factors || null
+            }, null, 2)}</pre>
+          </div>
           <div>
             <strong>Known facts before / after</strong>
             <pre>{JSON.stringify({
@@ -339,8 +370,31 @@ export default function AiQualityPage() {
             <pre>{JSON.stringify(selected.semanticInterpretation, null, 2)}</pre>
           </div>
           <div>
-            <strong>Conversation turns</strong>
-            <pre>{JSON.stringify(selected.conversationTurns || [], null, 2)}</pre>
+            <strong>Conversation context</strong>
+            {(selected.conversationTurns || []).length ? (
+              <table className="ai-quality-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Role</th>
+                    <th>Direction</th>
+                    <th>Intent / step</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selected.conversationTurns.map((turn) => (
+                    <tr key={turn.id}>
+                      <td>{turn.createdAt || "—"}</td>
+                      <td>{turn.role || "—"}</td>
+                      <td>{turn.direction || "—"}</td>
+                      <td>{turn.intent || turn.currentStep || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No bounded conversation turns available.</p>
+            )}
           </div>
           {selected.learningProposal ? (
             <div>
@@ -376,7 +430,12 @@ export default function AiQualityPage() {
           </label>
           <div className="ai-quality-actions">
             {LEARNING_ACTIONS.map((item) => (
-              <button key={item.id} type="button" onClick={() => runLearningAction(item.id)}>
+              <button
+                key={item.id}
+                type="button"
+                disabled={item.id === "approve_regression" && !isRegressionApprovable(selected)}
+                onClick={() => runLearningAction(item.id)}
+              >
                 {item.label}
               </button>
             ))}
