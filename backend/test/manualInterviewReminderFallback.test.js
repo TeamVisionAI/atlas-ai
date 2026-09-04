@@ -10,6 +10,7 @@ const {
   buildManualZoomInvitationFallback,
   formatReminderWhenParts
 } = require("../core/manualInterviewReminderFallback");
+const { TEAM_VISION_ORGANIZATION_ID } = require("../core/teamVisionSeedTenant");
 
 const OFFICE_ADDRESS = "2500 NW 79th Ave, Suite 189, Doral, FL 33122";
 const START_ISO = "2026-03-15T18:30:00.000Z";
@@ -27,7 +28,8 @@ test("in-person reminder fallback includes name, local time, office address, and
     timezone: TIMEZONE,
     meetingMode: "in_person",
     officeAddress: OFFICE_ADDRESS,
-    language: "es"
+    language: "es",
+    organizationId: TEAM_VISION_ORGANIZATION_ID
   });
 
   assert.match(message, /Hola, Maria\./);
@@ -48,7 +50,8 @@ test("Zoom reminder fallback includes name, local time, Zoom wording, Ana Perez,
     timezone: TIMEZONE,
     meetingMode: "zoom",
     officeAddress: OFFICE_ADDRESS,
-    language: "es"
+    language: "es",
+    organizationId: TEAM_VISION_ORGANIZATION_ID
   });
 
   assert.match(message, /Hola, Maria\./);
@@ -67,7 +70,8 @@ test("interview details fallback includes local time, office or Zoom, and Ana Pe
     timezone: TIMEZONE,
     meetingMode: "in_person",
     officeAddress: OFFICE_ADDRESS,
-    language: "es"
+    language: "es",
+    organizationId: TEAM_VISION_ORGANIZATION_ID
   });
   assert.match(office, /Le confirmamos su cita/);
   assert.ok(office.includes(OFFICE_ADDRESS));
@@ -79,7 +83,8 @@ test("interview details fallback includes local time, office or Zoom, and Ana Pe
     timezone: TIMEZONE,
     meetingMode: "zoom",
     officeAddress: OFFICE_ADDRESS,
-    language: "es"
+    language: "es",
+    organizationId: TEAM_VISION_ORGANIZATION_ID
   });
   assert.ok(zoom.includes("por Zoom"));
   assert.ok(!zoom.includes(OFFICE_ADDRESS));
@@ -89,7 +94,8 @@ test("office address fallback includes configured address and Ana Perez", () => 
   const message = buildManualOfficeAddressFallback({
     prospectName: "Maria Lopez",
     officeAddress: OFFICE_ADDRESS,
-    language: "es"
+    language: "es",
+    organizationId: TEAM_VISION_ORGANIZATION_ID
   });
   assert.match(message, /Hola, Maria\./);
   assert.ok(message.includes(OFFICE_ADDRESS));
@@ -103,7 +109,8 @@ test("Zoom invitation fallback excludes office address", () => {
     startIso: START_ISO,
     timezone: TIMEZONE,
     officeAddress: OFFICE_ADDRESS,
-    language: "es"
+    language: "es",
+    organizationId: TEAM_VISION_ORGANIZATION_ID
   });
   assert.ok(message.includes("por Zoom"));
   assert.ok(message.includes("Ana Perez"));

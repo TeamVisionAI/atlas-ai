@@ -20,7 +20,11 @@ const APPROVED_LEAD =
 
 test("branding tokens: navy/gold defaults; tenant-ready override shape", () => {
   const branding = resolveQrInterstitialBranding();
-  assert.equal(branding.organizationDisplayName, "Team Vision");
+  assert.equal(branding.organizationDisplayName, "Atlas");
+  const tv = resolveQrInterstitialBranding({
+    organizationId: "00000000-0000-4000-8000-000000000001"
+  });
+  assert.equal(tv.organizationDisplayName, "Team Vision");
   assert.equal(branding.productName, "Atlas");
   assert.equal(branding.colors.background, "#0b1220");
   assert.equal(branding.colors.accent, "#e0b84c");
@@ -48,7 +52,7 @@ test("interstitial copy matches approved Spanish structure", () => {
   assert.match(html, new RegExp(APPROVED_LEAD.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(html, /¿Cuál es tu número de WhatsApp\?/);
   assert.match(html, /<button type="submit">Continuar por WhatsApp<\/button>/);
-  assert.match(html, /Team Vision · Atlas/);
+  assert.match(html, /Atlas · Atlas/);
   assert.doesNotMatch(html, /Usa tu número de WhatsApp para continuar/);
   assert.doesNotMatch(html, /No pedimos más datos aquí/);
 });
@@ -94,7 +98,7 @@ test("error page uses same branding family", () => {
     body: "Este código QR ya no está activo."
   });
   assert.match(html, /--qi-bg:\s*#0b1220/);
-  assert.match(html, /Team Vision · Atlas/);
+  assert.match(html, /Atlas · Atlas/);
   assert.doesNotMatch(html, /#2f9e6b/);
 });
 

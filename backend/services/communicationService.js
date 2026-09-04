@@ -473,6 +473,17 @@ async function assembleManualCommunicationFallback(
   const language = resolveProspectCommunicationCode(prospect) || "es";
   const meetingType = resolveInterviewTypeFromAppointment(appointment, prospect);
   const inPerson = meetingType === "office" || purpose === MANUAL_COMMUNICATION_PURPOSES.OFFICE;
+  let contactName = null;
+  try {
+    const representative = await resolveAssignedRepresentative(appointment, context);
+    contactName =
+      representative?.profile?.name ||
+      representative?.interviewerName ||
+      appointment?.interviewerName ||
+      null;
+  } catch {
+    contactName = appointment?.interviewerName || null;
+  }
   let officeAddress = appointment.meetingAddress || appointment.meeting_address || null;
   if (inPerson && !isCompleteOfficeAddress(officeAddress)) {
     try {
@@ -501,7 +512,9 @@ async function assembleManualCommunicationFallback(
     timezone: appointment.timezone || "America/New_York",
     meetingMode: inPerson ? "in_person" : "zoom",
     officeAddress,
-    language
+    language,
+    organizationId,
+    contactName
   });
 
   let customerCareWindow = null;

@@ -4,6 +4,27 @@
  */
 
 export const MANUAL_REMINDER_CONTACT_NAME = "Ana Perez";
+export const TEAM_VISION_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
+export const NEUTRAL_REMINDER_CONTACT_NAME = Object.freeze({
+  en: "our team",
+  es: "nuestro equipo"
+});
+
+export function resolveManualReminderContactName({
+  contactName = null,
+  organizationId = null,
+  language = "es"
+} = {}) {
+  const provided = String(contactName || "").trim();
+  if (provided) {
+    return provided;
+  }
+  if (String(organizationId || "").trim() === TEAM_VISION_ORGANIZATION_ID) {
+    return MANUAL_REMINDER_CONTACT_NAME;
+  }
+  const lang = language === "en" || language === "english" ? "en" : "es";
+  return NEUTRAL_REMINDER_CONTACT_NAME[lang];
+}
 
 export const MANUAL_COMMUNICATION_PURPOSES = Object.freeze({
   INVITATION: "invitation",
@@ -93,7 +114,8 @@ function resolveFallbackFacts({
   meetingMode = "zoom",
   officeAddress = null,
   language = "es",
-  contactName = MANUAL_REMINDER_CONTACT_NAME
+  contactName = null,
+  organizationId = null
 } = {}) {
   const firstName = getFirstName(prospectName);
   const lang = language === "en" || language === "english" ? "en" : "es";
@@ -102,7 +124,11 @@ function resolveFallbackFacts({
   const timeLabel = when.time || "";
   const inPerson = isInPersonMeetingMode(meetingMode);
   const address = inPerson && looksCompleteOfficeAddress(officeAddress) ? String(officeAddress).trim() : "";
-  const contact = String(contactName || MANUAL_REMINDER_CONTACT_NAME).trim() || MANUAL_REMINDER_CONTACT_NAME;
+  const contact = resolveManualReminderContactName({
+    contactName,
+    organizationId,
+    language: lang
+  });
   const hello = lang === "en"
     ? firstName ? `Hi, ${firstName}.` : "Hi."
     : firstName ? `Hola, ${firstName}.` : "Hola.";
@@ -225,6 +251,17 @@ function workspaceFallbackFacts(workspace = null, language = null) {
     timezone: interview.timezone || workspace?.timezone || "America/New_York",
     meetingMode: interview.type || interview.meetingType || "zoom",
     officeAddress: interview.meetingAddress || interview.officeAddress || null,
+    organizationId:
+      workspace?.organizationId ||
+      workspace?.organization_id ||
+      workspace?.prospect?.organizationId ||
+      workspace?.prospect?.organization_id ||
+      null,
+    contactName:
+      interview.interviewerName ||
+      workspace?.interviewerName ||
+      workspace?.representative?.name ||
+      null,
     language:
       language ||
       workspace?.capture?.preferredLanguage ||
@@ -244,7 +281,7 @@ export function buildManualInterviewReminderFallbackFromWorkspace({
     message,
     phone: phone || workspace?.phone || workspace?.prospect?.phone || null,
     fallbackUsed: true,
-    contactName: MANUAL_REMINDER_CONTACT_NAME
+    contactName: resolveManualReminderContactName(workspaceFallbackFacts(workspace, language))
   };
 }
 
@@ -262,7 +299,7 @@ export function buildManualCommunicationFallbackFromWorkspace({
     message,
     phone: phone || workspace?.phone || workspace?.prospect?.phone || null,
     fallbackUsed: true,
-    contactName: MANUAL_REMINDER_CONTACT_NAME,
+    contactName: resolveManualReminderContactName(workspaceFallbackFacts(workspace, language)),
     purpose,
     titleKey: MANUAL_COMMUNICATION_TITLE_KEYS[purpose] || "whatsappActionCustomMessage",
     template: MANUAL_COMMUNICATION_TEMPLATES[purpose] || "interview_reminder"

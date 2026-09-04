@@ -70,6 +70,54 @@ function contextRequiresHumanHold(context) {
   );
 }
 
+async function hydrateTenantOfficeIdentity(organizationId, dependencies = {}) {
+  const orgId = organizationId || null;
+  let organizationName = null;
+  if (typeof dependencies.getOrganizationBranding === "function") {
+    try {
+      const branding = await dependencies.getOrganizationBranding(orgId);
+      organizationName = branding?.name || null;
+    } catch {
+      organizationName = null;
+    }
+  } else if (orgId) {
+    try {
+      const branding = await require("../../services/organizationBrandingService").getOrganizationBranding(
+        orgId
+      );
+      organizationName = branding?.name || null;
+    } catch {
+      organizationName = null;
+    }
+  }
+
+  const { isSafeOrganizationDisplayName } = require("./tenantBranding");
+  if (!isSafeOrganizationDisplayName(organizationName, orgId)) {
+    organizationName = null;
+  }
+
+  try {
+    const { resolveCanonicalOfficeAddress } = require("../officeAddressResolver");
+    const resolved = await resolveCanonicalOfficeAddress(
+      { organizationId: orgId, meetingType: "in_person" },
+      {
+        getMeetingManagement: dependencies.getMeetingManagement
+      }
+    );
+    return {
+      organizationName,
+      officeAddress: resolved?.address || null,
+      officeAddressSource: resolved?.source || "unavailable"
+    };
+  } catch {
+    return {
+      organizationName,
+      officeAddress: null,
+      officeAddressSource: "unavailable"
+    };
+  }
+}
+
 function hasExplicitReturnToAtlas(workflowState) {
   return (
     Boolean(workflowState?.returnedToAtlasAt) &&
@@ -1060,8 +1108,12 @@ async function attemptLiveV2Authoring({
           prospectId: canonicalProspectId
         }).catch(() => null);
 
+  const tenantOffice = await hydrateTenantOfficeIdentity(organizationId, dependencies);
   const contextInput = buildReconstructionInput(prospect, {
     organizationId,
+    organizationName: tenantOffice.organizationName,
+    officeAddress: tenantOffice.officeAddress,
+    officeAddressSource: tenantOffice.officeAddressSource,
     prospectId: canonicalProspectId,
     prospectPhone,
     legacyProspectId,

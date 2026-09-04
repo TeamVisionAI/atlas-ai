@@ -3398,7 +3398,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 1. **Preview first** — Manual communication actions still load the assembled preview when that path succeeds. Existing WhatsApp composer / preview UX is unchanged on success.
 2. **Fallback on failure** — If preview assembly or load fails for any manual MC/PW communication action, Atlas must not block the operator with “Could not load the communication preview.” Build a deterministic body from appointment/workspace facts (no AI/model) and keep HUMAN compose/send available.
 3. **Covered actions** — Custom WhatsApp Message (opens composer; no preview required), Resend Interview Details, Send Office Address, Send Zoom Invitation, and Send Interview Reminder.
-4. **Fallback facts** — Body includes prospect first name, scheduled weekday/date/time in the appointment/tenant timezone when relevant, meeting mode, and contact name **Ana Perez**. In-person/office includes the configured office address when complete (BR-077). Zoom wording must not include the office address.
+4. **Fallback facts** — Body includes prospect first name, scheduled weekday/date/time in the appointment/tenant timezone when relevant, meeting mode, and a tenant-safe contact name (BR-225). Assigned interviewer/recruiter name wins. **Ana Perez** is the Team Vision seed default only — never a shared global fallback. In-person/office includes the configured office address when complete (BR-077). Zoom wording must not include the office address.
 5. **HUMAN / manual send** — Fallback send stays the operator HUMAN composer path. Do not convert these actions into automated Atlas outreach. Do not change reminder cadence, appointment ownership, prospect ownership, BR-142, or BR-200 eligibility.
 6. **Zoom URL is not required for reminder preview** — Missing Zoom join URL must not fail interview-reminder preview. Invitation/Zoom-link assembled previews may still require a URL; fallback still opens composer without a URL.
 7. **Boundaries** — Does not change approved-template catalog, automated reminder delivery, or lead eligibility.
@@ -3609,6 +3609,29 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 5. **Tenant handoff branding** — Team Vision may say Team Vision. Other tenants use `un miembro de {organizationName}` when the display name is safe, otherwise `un miembro de nuestro equipo` / `a member of our team`. Never fall back to Team Vision for a non-TV tenant, including a spoofed name. Live V2 must forward `organizationId` / `organizationName` through `buildResponsePlan`. The same phrase helper applies to V1 coordinator / already-confirmed fallbacks so EMPTY_OR_UNSAFE CE fallthrough cannot reintroduce Team Vision.
 6. **Ownership unchanged** — HUMAN takeover still silences Atlas until Return-to-Atlas. An Atlas reply after an explicit Return-to-Atlas is valid. Do not treat that sequence as an ownership leak.
 7. **Affirmative auth still advances** — `Sí, tengo permiso de trabajo` (and existing BR-096/100 shorthands) still authorize.
+
+---
+
+## BR-225 — Tenant Office / Identity Isolation for Recruit AI
+
+**Implements:** Shared Recruit AI customer copy resolves office, Facebook welcome, reminder contact, and QR display name from the acting tenant. Team Vision seed fallbacks stay Team Vision-only.  
+**Domain:** Recruit AI / appointments / communications / QR  
+**Depends on:** BR-018, BR-077, BR-146, BR-214, BR-224  
+**Related:** BR-019–022 coverage geography remains a separate tenant-config problem (recommend BR-226)  
+**Status:** Implemented — not merged  
+**Engine target:** `officeAddressResolver.selectCustomerFacingOfficeAddress`; `teamVisionWorkflowCopy`; `responseRenderer`; `liveAuthoringBridge`; `recruitingWorkflowOrchestrator`; `manualInterviewReminderFallback`; `qrInterstitialBranding`  
+**Tests:** `backend/test/recruitAiV2TenantOfficeIdentityBr225.test.js`
+
+### Rules
+
+1. **One office selector** — Customer-facing office copy uses `selectCustomerFacingOfficeAddress` over an already-resolved BR-077 identity. Do not add a third office resolver. `getOfficeLocation()` is Team Vision seed only.
+2. **Provenance** — Team Legacy (and any other tenant) must receive its Meeting Management / org office, recorded as `meeting_management` (or request / persisted appointment). Same street text as Team Vision is not proof of Team Vision fallback.
+3. **Fail closed** — A non-Team-Vision tenant with no complete office never inherits Doral / Team Vision Office. Use Zoom day-part or neutral in-person wording without an invented address.
+4. **Facebook welcome** — Team Vision may say “Atlas de Team Vision”. Other tenants use a safe organization name or “Soy Atlas” / “I'm Atlas”. Never fall back to Team Vision.
+5. **Reminder contact** — Assigned interviewer name wins. Ana Perez is Team Vision seed default only.
+6. **QR interstitial** — Shared `/go` path defaults to Atlas. Team Vision display name only when the campaign org is the seed tenant or a safe override is supplied.
+7. **Resolver ownership** — `tenantBranding.js` = customer team/org naming. `officeAddressResolver` / operational identity = office/location. Assigned recruiter = person naming. `resolveTenantDisplayName` stays operational identity and must not become the WhatsApp branding fallback.
+8. **Boundaries** — Does not redesign `localAreaConfig` / `evaluateCoverage`. Does not change production data, ads, Team Legacy V2 grants, or Railway allowlists.
 
 ---
 

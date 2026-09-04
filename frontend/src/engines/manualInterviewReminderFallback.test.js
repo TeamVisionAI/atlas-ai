@@ -18,6 +18,7 @@ const START_ISO = "2026-03-15T18:30:00.000Z";
 const TIMEZONE = "America/New_York";
 
 const officeWorkspace = {
+  organizationId: "00000000-0000-4000-8000-000000000001",
   phone: "+15555550100",
   prospect: { name: "Maria Lopez" },
   capture: { preferredLanguage: "es" },
@@ -103,7 +104,8 @@ test("in-person reminder fallback includes office address and Ana Perez", () => 
     timezone: TIMEZONE,
     meetingMode: "office",
     officeAddress: OFFICE_ADDRESS,
-    language: "es"
+    language: "es",
+    organizationId: "00000000-0000-4000-8000-000000000001"
   });
 
   assert.match(message, /Hola, Maria\./);

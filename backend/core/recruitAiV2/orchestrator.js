@@ -574,6 +574,25 @@ async function processRecruitAiV2Turn({
     persistenceSource = loaded.persistenceSource || "ephemeral";
   }
 
+  // BR-225 — tenant office identity is resolved at the live edge and must win
+  // over stale durable context so a settings change is used without code edits.
+  if (
+    contextInput &&
+    (contextInput.officeAddress ||
+      contextInput.officeAddressSource ||
+      contextInput.organizationName ||
+      contextInput.organizationId)
+  ) {
+    loaded = mergeConversationContext(loaded, {
+      organizationId: contextInput.organizationId || loaded.organizationId,
+      organizationName:
+        contextInput.organizationName || loaded.organizationName,
+      officeAddress: contextInput.officeAddress || loaded.officeAddress,
+      officeAddressSource:
+        contextInput.officeAddressSource || loaded.officeAddressSource
+    });
+  }
+
   // Implements BR-222 — fresh IUL intake restarts the episode before interpret.
   try {
     const {

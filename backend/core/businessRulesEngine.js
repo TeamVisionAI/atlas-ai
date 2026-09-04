@@ -55,6 +55,7 @@ function normalize(value = "") {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+/** Team Vision seed BR-018 only. Never use as a shared tenant fallback (BR-225). */
 function getOfficeLocation() {
   return { ...OFFICE_LOCATION };
 }
