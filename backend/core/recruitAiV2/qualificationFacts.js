@@ -279,10 +279,13 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
       /^(solo|only)(\s+un|\s+an?)?\s+itin([.!]?)?$/i.test(t) ||
       /^itin(\s+only)?([.!]?)?$/i.test(t) ||
       /^(no tengo)([.!]?)?$/i.test(t) ||
+      /^(no\s+(lo|la|los|las)\s+(tengo|have))([.!]?)?$/.test(t) ||
+      /^(todavia no|aun no)([.!]?)?$/.test(t) ||
       /^(ya\s+)?te (lo\s+)?dije que no([.!]?)?$/i.test(t) ||
       /^i (only )?have (an? )?itin([.!]?)?$/i.test(t) ||
       /^i don'?t have( (it|that|any|documents?|papers?))?([.!]?)?$/i.test(t) ||
       /\bno tengo (permiso|papeles|documentos?|documentacion)\b/.test(t) ||
+      /\bno (lo|la) (tengo|have)\b/.test(t) ||
       /\b(todavia no tengo permiso|estoy esperando( el)? permiso|sin permiso|sin papeles)\b/.test(
         t
       ) ||
@@ -360,28 +363,30 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
 
   const yesAuth =
     /^(si|yes|yep|yeah)\b/.test(t) && mentionsWorkAuthorization(raw);
-  // Pending ask_authorization only: "si tengo" / "sí tengo" means yes to the
-  // work-permit question just asked — do not invent auth without that context.
-  const yesTengoShorthand =
+  // Pending ask_authorization only. Object pronouns ("si lo tengo") and
+  // document/authorized phrasing satisfy the question just asked.
+  // Do not invent auth without that pending context. "si tengo visa" stays null.
+  const yesPrefix = "((si|yes|yep|yeah|claro)[,:]?\\s+)*";
+  const objectPronoun = "((lo|la|los|las)\\s+)?";
+  const haveVerb = "(tengo|cuento con|have)";
+  const authNoun =
+    "(\\s+(permiso( de trabajo)?|papeles|documentos?|documentacion|documentation)(\\s+para( poder)? (trabajar|work)|\\s+to work)?)?";
+  const authorizedClause =
+    "(estoy|i am|i'?m)\\s+(autorizad[oa]|authorized)(\\s+((para|to)\\s+(trabajar|work)))?";
+  const pendingPossessiveYes =
     pendingAuth &&
     !mentionsLicense(raw) &&
-    /^(si|yes|yep|yeah|claro)[,:]?\s+(tengo|have)(\s+(permiso|papeles|documentacion))?\s*[.!?]?$/i.test(
-      raw.trim()
-    );
+    (new RegExp(`^${yesPrefix}${objectPronoun}${haveVerb}${authNoun}([.!]?)?$`).test(
+      t
+    ) ||
+      new RegExp(`^${yesPrefix}${authorizedClause}([.!]?)?$`).test(t));
   // Implements BR-229 — pending ask_authorization stacked yes ("si claro")
   // outranks FAQ/location leftovers. Unambiguous permit shorthand too.
-  const pendingPermitShorthand =
-    pendingAuth &&
-    !mentionsLicense(raw) &&
-    /^(si[,:]?\s+)?(tengo|cuento con)(\s+(permiso|papeles|documentacion))?([.!]?)?$/i.test(
-      raw.trim()
-    );
   const yesShort =
     pendingAuth &&
     !mentionsLicense(raw) &&
     (isBareConversationalYes(raw) ||
-      yesTengoShorthand ||
-      pendingPermitShorthand ||
+      pendingPossessiveYes ||
       (/^(si|yes).{0,40}\b(tengo|have|cuento con)\b/i.test(raw) &&
         mentionsWorkAuthorization(raw)));
   const patternYes =
@@ -396,6 +401,7 @@ function parseWorkAuthorizationAnswer(text, context = {}) {
     pendingBornHereAffirmative ||
     yesAuth ||
     yesShort ||
+    pendingPossessiveYes ||
     patternYes
   ) {
     return WORK_AUTHORIZATION.AUTHORIZED;
