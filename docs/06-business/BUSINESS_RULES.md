@@ -3730,6 +3730,28 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-230 — TikTok LIVE Attribution Bridge (TikFinity, Phase 1)
+
+**Implements:** Record TikFinity TikTok LIVE command webhooks as tenant-scoped engagement. Do not create a prospect or start any conversation from a username alone.  
+**Domain:** Integrations / attribution  
+**Depends on:** tenant organization identity  
+**Related:** future LIVE → WhatsApp / QR correlation (not this rule)  
+**Status:** Implemented — not merged  
+**Engine target:** `tikfinityLiveEventService`; `routes/tikfinityLiveEvent`  
+**Tests:** `backend/test/tikfinityLiveEventBridge.test.js`  
+**Docs:** `docs/integrations/tikfinity-live.md`
+
+### Rules
+
+1. **Attribution only** — Persist organization, username, command, command text, optional gift name, campaign, funnel, source `TIKTOK_LIVE`, platform `tiktok`. Do not create a core prospect, recruiting prospect, IUL lead, conversation, recruiter assignment, or WhatsApp outbound.
+2. **Secret required** — `TIKFINITY_WEBHOOK_SECRET` compared with query `secret` (or `x-tikfinity-secret`) using a constant-time-safe compare. Missing or wrong secret is `401`. Do not log the secret.
+3. **Tenant explicit** — `organizationId` is required and must exist. Do not infer tenant from username. Fail closed on missing, malformed, or unknown org.
+4. **Command whitelist** — Normalize `/iul`, `?IUL`, `IUL` → `IUL` and `/trabajo` → `TRABAJO`. Unknown commands return `400`.
+5. **Dedupe** — Same org + username + command + command text inside a short window must not create unlimited rows. Safe duplicate response may return `recorded: false`.
+6. **Boundaries** — Do not change Recruit AI, WhatsApp eligibility, campaigns, scheduling, or tenant grants.
+
+---
+
 ## BR-192 — Terminal Prospect Close Cancels Follow-ups
 
 **Implements:** When a prospect reaches a true terminal/closed disposition, cancel open future follow-up obligations so Mission Control close and Follow-ups stay consistent.  
