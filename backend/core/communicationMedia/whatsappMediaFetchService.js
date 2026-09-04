@@ -1,12 +1,12 @@
 /**
- * Async Meta media fetch + Safari-safe MP3 transcode + Phase 2 STT (BR-140 / BR-141).
+ * Async Meta media fetch + Safari-safe MP3 transcode + Phase 2 STT (BR-140 / BR-141 / BR-228).
  * One poller lifecycle. Original always preserved.
  * Failure updates media status only — never ownership, BR-080, or TAKE OVER.
  */
 
 "use strict";
 
-const { resolveWhatsAppSendCredentials } = require("../whatsappSendCredentials");
+const { resolveWhatsAppMediaFetchCredentials } = require("../whatsappSendCredentials");
 const { logWhatsAppStage } = require("../whatsappStructuredLogger");
 const {
   FETCH_STATUS,
@@ -15,6 +15,7 @@ const {
   MAX_TRANSCODE_ATTEMPTS,
   MAX_COMMUNICATION_MEDIA_BYTES,
   FETCH_LOCK_STALE_MS,
+  FETCH_POLL_BATCH_LIMIT,
   PLAYBACK_FORMAT,
   TRANSCRIPT_STATUS
 } = require("./constants");
@@ -87,10 +88,75 @@ async function defaultDownloadBytes(url, accessToken) {
   return { buffer, mimeType };
 }
 
+function trimId(value) {
+  const trimmed = String(value || "").trim();
+  return trimmed || null;
+}
+
+async function resolveInboundPhoneNumberId(row, dependencies = {}) {
+  const explicit = trimId(dependencies.phoneNumberId || row?.phone_number_id);
+  if (explicit) {
+    return explicit;
+  }
+  const providerMessageId = trimId(row?.provider_message_id);
+  if (!providerMessageId) {
+    return null;
+  }
+  if (
+    typeof dependencies.findObservabilityByProviderMessageId !== "function" &&
+    typeof dependencies.credentialsResolver === "function"
+  ) {
+    return null;
+  }
+  try {
+    const lookup =
+      dependencies.findObservabilityByProviderMessageId ||
+      (async (id) => {
+        const {
+          findByProviderMessageId
+        } = require("../../repositories/whatsappInboundWebhookObservabilityRepository");
+        return findByProviderMessageId(id);
+      });
+    const snapshot = await lookup(providerMessageId);
+    if (!snapshot?.phone_number_id) {
+      return null;
+    }
+    if (
+      snapshot.organization_id &&
+      row?.organization_id &&
+      String(snapshot.organization_id) !== String(row.organization_id)
+    ) {
+      return null;
+    }
+    return trimId(snapshot.phone_number_id);
+  } catch (error) {
+    logWhatsAppStage("communication_media_phone_number_lookup_failed", {
+      level: "warn",
+      organizationId: row?.organization_id || null,
+      providerMessageId,
+      error: error?.message || "unknown"
+    });
+    return null;
+  }
+}
+
+async function defaultMediaCredentialsResolver(organizationId, options = {}) {
+  const resolverOptions = {
+    organizationId,
+    phoneNumberId: options.phoneNumberId
+  };
+  if (options.connectionRepository) {
+    resolverOptions.connectionRepository = options.connectionRepository;
+  }
+  return resolveWhatsAppMediaFetchCredentials(resolverOptions);
+}
+
 async function fetchWhatsAppAudioBytes({
   organizationId,
   metaMediaId,
-  credentialsResolver = resolveWhatsAppSendCredentials,
+  phoneNumberId = null,
+  credentialsResolver = defaultMediaCredentialsResolver,
+  connectionRepository = null,
   graphGetJson = defaultGraphGetJson,
   downloadBytes = defaultDownloadBytes
 }) {
@@ -100,7 +166,10 @@ async function fetchWhatsAppAudioBytes({
     throw error;
   }
 
-  const credentials = await credentialsResolver(organizationId);
+  const credentials = await credentialsResolver(organizationId, {
+    phoneNumberId,
+    connectionRepository
+  });
   if (!credentials?.accessToken) {
     const error = new Error("WHATSAPP_CREDENTIALS_MISSING");
     error.publicCode = "WHATSAPP_CREDENTIALS_MISSING";
@@ -333,17 +402,21 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
     return transcript ? { ...failed, transcript } : failed;
   }
 
+  const nextAttempts = attempts + 1;
   await repository.update(row.id, organizationId, {
     fetchStatus: FETCH_STATUS.FETCHING,
-    fetchAttempts: attempts,
+    fetchAttempts: nextAttempts,
     fetchError: null
   });
 
   try {
+    const phoneNumberId = await resolveInboundPhoneNumberId(row, dependencies);
     const fetched = await fetchWhatsAppAudioBytes({
       organizationId,
       metaMediaId: row.meta_media_id,
+      phoneNumberId,
       credentialsResolver: dependencies.credentialsResolver,
+      connectionRepository: dependencies.connectionRepository,
       graphGetJson: dependencies.graphGetJson,
       downloadBytes: dependencies.downloadBytes
     });
@@ -372,7 +445,7 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
     const nativePlayback = isBrowserNativeAudioMime(mimeType);
     await repository.update(row.id, organizationId, {
       fetchStatus: FETCH_STATUS.STORED,
-      fetchAttempts: attempts + 1,
+      fetchAttempts: nextAttempts,
       fetchError: null,
       storagePath: stored.storagePath,
       mimeType,
@@ -397,7 +470,7 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
     const storedRow = {
       ...row,
       fetch_status: FETCH_STATUS.STORED,
-      fetch_attempts: attempts + 1,
+      fetch_attempts: nextAttempts,
       storage_path: stored.storagePath,
       mime_type: mimeType,
       transcode_status: nativePlayback
@@ -428,7 +501,6 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
       originalBuffer: fetched.buffer
     });
   } catch (error) {
-    const nextAttempts = attempts + 1;
     const terminal = nextAttempts >= MAX_FETCH_ATTEMPTS;
     await repository.update(row.id, organizationId, {
       fetchStatus: terminal ? FETCH_STATUS.FAILED : FETCH_STATUS.PENDING,
@@ -463,11 +535,33 @@ async function processOneCommunicationMediaFetch(row, dependencies = {}) {
   }
 }
 
+async function processCommunicationMediaById({
+  mediaId,
+  organizationId,
+  phoneNumberId = null,
+  repository = null,
+  ...dependencies
+} = {}) {
+  if (!mediaId || !organizationId) {
+    return { status: null, skipped: true, reason: "MEDIA_ID_REQUIRED" };
+  }
+  const repo = repository || getCommunicationMediaRepository(dependencies);
+  const row = await repo.findById(mediaId, organizationId);
+  if (!row) {
+    return { status: null, skipped: true, reason: "MEDIA_NOT_FOUND", id: mediaId };
+  }
+  return processOneCommunicationMediaFetch(row, {
+    ...dependencies,
+    repository: repo,
+    phoneNumberId
+  });
+}
+
 async function processPendingWhatsAppMediaFetches(dependencies = {}) {
   const repository =
     dependencies.repository || getCommunicationMediaRepository(dependencies);
   const pending = await repository.listPending({
-    limit: dependencies.limit || 10,
+    limit: dependencies.limit || FETCH_POLL_BATCH_LIMIT,
     now: dependencies.now || Date.now(),
     staleMs: dependencies.staleMs || FETCH_LOCK_STALE_MS
   });
@@ -525,8 +619,10 @@ module.exports = {
   isFetchComplete,
   isTranscodeComplete,
   fetchWhatsAppAudioBytes,
+  resolveInboundPhoneNumberId,
   processOneCommunicationMediaTranscode,
   processOneCommunicationMediaFetch,
+  processCommunicationMediaById,
   processPendingWhatsAppMediaFetches,
   persistInboundAudioMedia,
   maybeProcessTranscript

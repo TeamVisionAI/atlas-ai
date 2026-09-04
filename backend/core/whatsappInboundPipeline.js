@@ -658,14 +658,16 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     });
   }
 
-  // BR-140 — persist structured audio metadata immediately; fetch bytes asynchronously.
-  // Must not block webhook completion or change ownership / BR-080 / qualification.
+  // BR-140 / BR-228 — persist structured audio metadata immediately, then process
+  // that exact media id. Must not block webhook completion or change ownership /
+  // BR-080 / qualification. Poller remains retry fallback.
   const isAudioInbound = String(inbound.messageType || "").toLowerCase() === "audio";
+  let persistedMedia = null;
   try {
     const persistMedia =
       dependencies.persistInboundAudioMedia ||
       require("./communicationMedia/whatsappMediaFetchService").persistInboundAudioMedia;
-    await persistMedia({
+    persistedMedia = await persistMedia({
       organizationId: organizationId || prospect?.organization_id || claimedOrganizationId || null,
       prospectId: prospect?.id || null,
       conversationLogId: logResult.log?.id || null,
@@ -681,7 +683,8 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
     });
   }
 
-  if (isAudioInbound) {
+  const persistedRow = persistedMedia?.row || (persistedMedia?.id ? persistedMedia : null);
+  if (isAudioInbound && persistedRow?.id) {
     const schedule =
       dependencies.scheduleMediaProcessing ||
       ((work) => {
@@ -696,11 +699,22 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
           });
         });
       });
+    const mediaOrganizationId =
+      persistedRow.organization_id ||
+      organizationId ||
+      prospect?.organization_id ||
+      claimedOrganizationId ||
+      null;
+    const inboundPhoneNumberId =
+      inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null;
     schedule(() => {
-      const {
-        processPendingWhatsAppMediaFetches
-      } = require("./communicationMedia/whatsappMediaFetchService");
-      return processPendingWhatsAppMediaFetches({
+      const processOne =
+        dependencies.processCommunicationMediaById ||
+        require("./communicationMedia/whatsappMediaFetchService").processCommunicationMediaById;
+      return processOne({
+        mediaId: persistedRow.id,
+        organizationId: mediaOrganizationId,
+        phoneNumberId: inboundPhoneNumberId,
         repository: dependencies.communicationMediaRepository || undefined,
         ...(dependencies.mediaProcessingDependencies || {})
       });

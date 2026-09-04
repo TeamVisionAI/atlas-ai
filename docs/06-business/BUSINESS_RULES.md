@@ -3687,7 +3687,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** Platform / AI quality / learning loop  
 **Depends on:** BR-175, BR-198  
 **Related:** BR-049, BR-174  
-**Status:** Implemented — not merged  
+**Status:** Implemented — merged  
 **Engine target:** `aiQualityService.loadConversationTurns`; `captureService`; `evidenceCompleteness`; `learningProposal`; `learningActions`  
 **Tests:** `backend/test/aiQualityEvidenceIntegrityBr227.test.js`; `frontend/src/pages/platform/aiQualityHelpers.test.js`
 
@@ -3702,6 +3702,28 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 7. **Approval gate** — Generate Proposal is allowed on insufficient evidence and must mark `INSUFFICIENT_EVIDENCE`. `recommended_action` must not be `approve_regression`. Approve Regression is rejected server-side. UI shows the reason and disables the action; UI disable is not sufficient by itself.
 8. **Historical cases** — Enrich turns at read time when phone correlation exists. Do not backfill production rows. Missing historical V2 interpretation stays null. Do not fabricate interpretation.
 9. **No autonomous learning** — Semantic APPLY stays OFF. No auto-edit of prompts, source, tests, or production behavior. No tenant-specific hardcoding. Team Legacy participation is unchanged by this rule.
+
+---
+
+## BR-228 — WhatsApp Voice-Note Media Fetch Starvation Fix
+
+**Implements:** Inbound WhatsApp voice notes must progress `pending → fetched/stored → playable` without starving newer rows behind completed history, and without using the wrong tenant or line token.  
+**Domain:** WhatsApp inbound / communication media / Conversations playback  
+**Depends on:** BR-140, BR-141, BR-147, BR-165  
+**Related:** BR-049 (Conversation Engine does not fetch media); playback remains independent of STT  
+**Status:** Implemented — not merged  
+**Engine target:** `communicationMediaRepository.listPending`; `whatsappMediaFetchService`; `whatsappInboundPipeline`; `resolveWhatsAppMediaFetchCredentials`  
+**Tests:** `backend/test/whatsappMediaFetchStarvationBr228.test.js`; existing Phase 1 / 1B / 2 + Conversations playback tests
+
+### Rules
+
+1. **Actionable-row selection** — `listPending` selects only rows that still need fetch, transcode, or STT work at query time. Oldest actionable work first. Bounded batch (`FETCH_POLL_BATCH_LIMIT`, default 5). Completed / terminal rows must not occupy the page and starve newer pending rows.
+2. **Exact-row immediate processing** — After `persistInboundAudioMedia`, the webhook schedules `processCommunicationMediaById` for that created media id and inbound `phone_number_id`. Immediate processing must not scan a global `listPending` list. The background poller is retry / drain only.
+3. **Retry is observable** — A processed row increments attempts and moves `pending → fetching → stored`, or `failed` after the retry policy. Rows must not remain pending at 0 attempts once selected. Expired Meta media ids may fail; that failure must be stored on the row. Do not fake recovery.
+4. **Connection-aware credentials (fail-closed)** — Graph fetch credentials come from the WhatsApp connection that received the media (`phone_number_id` + matching `organization_id`). Immediate path uses webhook `phoneNumberId`. Poller path may resolve the same id from inbound webhook observability for that `provider_message_id` only when the snapshot org matches the media org. No environment / Team Vision token fallback. No cross-tenant or cross-line token. If `phone_number_id` cannot be resolved, fail closed and record `WHATSAPP_CREDENTIALS_MISSING`.
+5. **No schema change in this rule** — Do not persist Meta temporary URLs as canonical identity. Canonical inbound identity remains Meta `media_id` plus private `communication-media` storage. `phone_number_id` is resolved from inbound metadata / observability (Option B). A `communication_media.phone_number_id` column is out of scope (split to a later rule if needed).
+6. **Playback architecture unchanged** — Meta `media_id` → authenticated Graph fetch → private storage → optional transcode → optional STT → Atlas playback endpoint → short-lived Supabase signed URL → frontend `<audio>`. Do not expose the Meta token or temp URL to the browser. Playback success must not depend on STT success.
+7. **Production backlog** — Do not mass-process historical pending rows in this change. After deploy: new voice notes process immediately; the poller may drain existing pending rows at the conservative batch/interval; expired historical Meta ids fail deterministically and become observable.
 
 ---
 

@@ -4,6 +4,9 @@
  */
 
 require("dotenv").config();
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
+process.env.SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "test-service-role-key";
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -37,6 +40,7 @@ const {
   createCommunicationMediaPlayback
 } = require("../core/communicationMedia/communicationMediaPlaybackService");
 const { processInboundWhatsAppMessage } = require("../core/whatsappInboundPipeline");
+const recruitingWorkflowHooks = require("../core/recruitingWorkflowHooks");
 const { processNormalizedInboundMessage } = require("../core/communicationHub");
 const { classifyInboundMedia } = require("../core/recruitAiV2/nonTextMedia");
 const { extractInformation } = require("../core/informationExtractor");
@@ -45,6 +49,8 @@ const conversationEngine = require("../core/conversationEngine");
 const newLeadAttentionEngine = require("../core/newLeadAttentionEngine");
 const { sanitizeCommunicationsCenterResponse } = require("../core/communicationsCenterSanitizer");
 const { FETCH_STATUS } = require("../core/communicationMedia/constants");
+
+recruitingWorkflowHooks.onMessageReceived = async () => null;
 
 function audioWebhook({ wamid = "wamid.AUDIO1", mediaId = "media-1" } = {}) {
   return {
@@ -145,7 +151,18 @@ function createPipelineHarness(repository) {
       persistInboundAudioMedia: (input) =>
         persistInboundAudioMedia({ ...input, repository }),
       communicationMediaRepository: repository,
-      scheduleMediaProcessing: () => {}
+      scheduleMediaProcessing: () => {},
+      campaignIntakeAttributionService: {
+        lookupInboundMatch: async () => ({ matched: false })
+      },
+      prospectHasDeliveredAutomatedOutbound: async () => false,
+      prospectHasAutomatedOutboundReply: async () => false,
+      reactivateWindowExpiredConversation: async () => null,
+      scheduleInboundBurstAggregation: async ({ inbound }) => ({
+        inbound,
+        burst: false
+      }),
+      disableFirstReplyRecovery: true
     }
   };
 }
@@ -158,7 +175,7 @@ test("1. audio webhook parser extracts media metadata", () => {
   assert.equal(message.messageType, "audio");
   assert.equal(message.body, "[audio message]");
   assert.equal(message.providerMessageId, "wamid.AUDIO1");
-  assert.equal(message.phone, "17865550100");
+  assert.equal(message.phone, "+17865550100");
   assert.ok(message.rawMessage);
   assert.deepEqual(extractWhatsAppMedia(message.rawMessage), {
     kind: "audio",
@@ -311,7 +328,7 @@ test("11. media fetch credentials stay server-side", () => {
     ),
     "utf8"
   );
-  assert.match(fetchSrc, /resolveWhatsAppSendCredentials/);
+  assert.match(fetchSrc, /resolveWhatsAppMediaFetchCredentials/);
   assert.match(fetchSrc, /Authorization: `Bearer \$\{accessToken\}`/);
   assert.doesNotMatch(playbackRoute, /WHATSAPP_ACCESS_TOKEN|accessToken/);
   assert.doesNotMatch(bubble, /WHATSAPP_ACCESS_TOKEN|graph\.facebook\.com/);

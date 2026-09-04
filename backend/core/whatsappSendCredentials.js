@@ -159,6 +159,49 @@ async function resolveWhatsAppSendCredentials(organizationId = null, options = {
   return envCredentials();
 }
 
+// Implements BR-228 — fail-closed inbound media fetch. Token must belong to the
+// connection that received the media. Never fall back to env / Team Vision token.
+async function resolveWhatsAppMediaFetchCredentials({
+  organizationId = null,
+  phoneNumberId = null,
+  connectionRepository = repository
+} = {}) {
+  const orgId = trimId(organizationId);
+  const inboundPhoneNumberId = trimId(phoneNumberId);
+  const repo = connectionRepository || repository;
+  if (!orgId || !inboundPhoneNumberId) {
+    return null;
+  }
+  if (typeof repo.findConnectionByPhoneNumberId !== "function") {
+    return null;
+  }
+
+  try {
+    const byPhone = await repo.findConnectionByPhoneNumberId(
+      inboundPhoneNumberId
+    );
+    const resolvedOrgId = byPhone?.organization_id
+      ? String(byPhone.organization_id)
+      : null;
+    if (
+      byPhone?.status !== "connected" ||
+      !resolvedOrgId ||
+      !sameId(resolvedOrgId, orgId)
+    ) {
+      return null;
+    }
+    return resolveConnectionCredentials(byPhone, repo, resolvedOrgId);
+  } catch (error) {
+    logWhatsAppStage("media_fetch_credentials_lookup_failed", {
+      level: "warn",
+      phoneNumberId: inboundPhoneNumberId,
+      organizationId: orgId,
+      error: error.message
+    });
+    return null;
+  }
+}
+
 function describeCredentialSource(credentials) {
   if (!credentials) {
     return "none";
@@ -169,6 +212,7 @@ function describeCredentialSource(credentials) {
 
 module.exports = {
   resolveWhatsAppSendCredentials,
+  resolveWhatsAppMediaFetchCredentials,
   graphApiVersion,
   describeCredentialSource,
   isOrgConnectionEligibleForRouting
