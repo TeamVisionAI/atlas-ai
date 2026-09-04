@@ -294,30 +294,53 @@ async function reclaimOwnershipAfterAuthoringLoss({
     late = (await awaitLateTrackedResult(error, env)).late;
   }
 
+  let durableForReclaim = null;
+  if ((!late?.nextContext && !late?.context) && persistence) {
+    try {
+      durableForReclaim = await loadDurableForConfirmableGuard({
+        persistence,
+        organizationId,
+        prospect,
+        normalized,
+        late: null
+      });
+    } catch {
+      durableForReclaim = null;
+    }
+  }
+
   const proposedDate =
     late?.nextContext?.appointment?.proposedDate ||
     late?.nextContext?.appointment?.confirmedDate ||
     late?.context?.appointment?.proposedDate ||
     late?.context?.appointment?.confirmedDate ||
+    durableForReclaim?.appointment?.proposedDate ||
+    durableForReclaim?.appointment?.confirmedDate ||
     null;
   const proposedTime =
     late?.nextContext?.appointment?.proposedTime ||
     late?.nextContext?.appointment?.confirmedTime ||
     late?.context?.appointment?.proposedTime ||
     late?.context?.appointment?.confirmedTime ||
+    durableForReclaim?.appointment?.proposedTime ||
+    durableForReclaim?.appointment?.confirmedTime ||
     null;
   const language =
     late?.nextContext?.preferredLanguage ||
     late?.context?.preferredLanguage ||
+    durableForReclaim?.preferredLanguage ||
     "spanish";
   const prospectId =
     late?.nextContext?.prospectId ||
     late?.context?.prospectId ||
+    durableForReclaim?.prospectId ||
+    prospect.id ||
     null;
   const agentId =
     actingUserId ||
     late?.nextContext?.agentId ||
     late?.context?.agentId ||
+    durableForReclaim?.agentId ||
     prospect.owner_user_id ||
     null;
   const phone = prospect.phone || normalized.phone || null;
@@ -361,9 +384,12 @@ async function reclaimOwnershipAfterAuthoringLoss({
     agentId,
     proposedDate,
     proposedTime,
-    timezone: late?.nextContext?.timezone || "America/New_York",
+    timezone:
+      late?.nextContext?.timezone ||
+      durableForReclaim?.timezone ||
+      "America/New_York",
     language,
-    baseContext: late?.nextContext || late?.context || null
+    baseContext: late?.nextContext || late?.context || durableForReclaim || null
   });
 
   if (!ownership.owned || !ownership.replyText) {
@@ -830,6 +856,133 @@ async function ownConfirmableProposalAfterAuthoringLoss({
 }
 
 /**
+ * Recruiting confirmation-time late settlement.
+ * Wait for the in-flight create (or a strictly matching concurrent appointment)
+ * before emitting appointment_confirm_deferred.
+ */
+async function settleRecruitingConfirmBookingAfterTimeout(args = {}) {
+  const {
+    error = null,
+    v2Result = null,
+    prospect = {},
+    normalized = {},
+    organizationId = null,
+    actingUserId = null,
+    allowExecution = false,
+    persistence = null,
+    env = process.env,
+    logStage = null
+  } = args;
+
+  const { INTENTS } = require("./constants");
+  const {
+    isRecruitingConfirmSlotTurn,
+    selectedSlotFromContext,
+    selectAdoptedConcurrentAppointment,
+    resolveRecruitingConfirmGraceMs,
+    RECRUITING_CONFIRM_GRACE_ENV
+  } = require("./recruitingConfirmationBookingSafety");
+
+  let late = v2Result;
+  if (!late && error) {
+    const settled = await awaitLateTrackedResult(error, {
+      ...env,
+      [RECRUITING_CONFIRM_GRACE_ENV]: undefined,
+      RECRUIT_AI_V2_LIVE_AUTHORING_POST_TIMEOUT_GRACE_MS: String(
+        resolveRecruitingConfirmGraceMs(env)
+      )
+    });
+    late = settled.late;
+  }
+
+  const durable = await loadDurableForConfirmableGuard({
+    persistence,
+    organizationId,
+    prospect,
+    normalized,
+    late
+  });
+  const context = late?.nextContext || late?.context || durable;
+  if (!context) {
+    return null;
+  }
+
+  const interpretation = {
+    intent: late?.interpretation?.intent || INTENTS.SCHEDULE_CONFIRM
+  };
+  if (
+    !isRecruitingConfirmSlotTurn({ context, interpretation }) &&
+    String(context.conversation?.lastQuestionAsked || "") !== "confirm_slot"
+  ) {
+    return null;
+  }
+
+  if (late?.execution?.success && late.execution.appointmentId) {
+    return reclaimOwnershipAfterAuthoringLoss({
+      ...args,
+      v2Result: late,
+      skipLateWait: true
+    });
+  }
+
+  const slot = selectedSlotFromContext(context);
+  if (!slot) {
+    return null;
+  }
+
+  if (late?.execution?.attempted && late.execution.success === false) {
+    return null;
+  }
+
+  const finder =
+    args.findActiveAppointment ||
+    (async (phoneArg, orgId, agent) => {
+      const {
+        findActiveAppointmentForProspect
+      } = require("../activeAppointmentResolver");
+      return findActiveAppointmentForProspect(phoneArg, orgId, agent);
+    });
+  let active = null;
+  try {
+    active = await finder(
+      prospect.phone || normalized.phone || null,
+      organizationId,
+      actingUserId || context.agentId || prospect.owner_user_id || null
+    );
+  } catch {
+    return null;
+  }
+
+  const adopted = selectAdoptedConcurrentAppointment(active, {
+    organizationId,
+    prospectId: context.prospectId || prospect.id || null,
+    legacyProspectId: context.legacyProspectId || prospect.id || null,
+    agentId: actingUserId || context.agentId || prospect.owner_user_id || null,
+    dateKey: slot.date,
+    timeKey: slot.time,
+    timezone: context.timezone || slot.timezone || "America/New_York",
+    meetingType: slot.meetingType,
+    now: Date.now()
+  });
+  if (!adopted.appointment) {
+    return null;
+  }
+
+  return reclaimOwnershipAfterAuthoringLoss({
+    ...args,
+    v2Result: late || {
+      nextContext: context,
+      execution: {
+        success: true,
+        appointmentId: adopted.appointment.id,
+        attempted: true
+      }
+    },
+    findActiveAppointment: async () => adopted.appointment
+  });
+}
+
+/**
  * BR-125 success reclaim, else BR-126 confirmable-proposal guard (no CE).
  */
 async function reclaimOrProtectConfirmableProposal(args = {}) {
@@ -842,6 +995,12 @@ async function reclaimOrProtectConfirmableProposal(args = {}) {
   if (iulImmediate?.authored && iulImmediate.replyText) {
     return iulImmediate;
   }
+
+  const recruitingSettled = await settleRecruitingConfirmBookingAfterTimeout(args);
+  if (recruitingSettled?.authored && recruitingSettled.replyText) {
+    return recruitingSettled;
+  }
+
   const reclaimed = await reclaimOwnershipAfterAuthoringLoss(args);
   if (reclaimed?.authored && reclaimed.replyText) {
     return reclaimed;
@@ -1587,6 +1746,7 @@ module.exports = {
   reclaimOwnershipAfterAuthoringLoss,
   ownConfirmableProposalAfterAuthoringLoss,
   reclaimOrProtectConfirmableProposal,
+  settleRecruitingConfirmBookingAfterTimeout,
   isConfirmableProposedDurable,
   createDefaultPersistenceService,
   isEligibleForLiveAuthoring,

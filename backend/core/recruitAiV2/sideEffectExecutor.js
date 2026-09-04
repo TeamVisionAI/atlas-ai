@@ -836,11 +836,19 @@ async function executeAuthorizedSideEffects({
     bookingTiming.availabilityMs = Date.now() - availabilityStarted;
     const available = slotResult?.slots || slotResult?.items || slotResult || [];
     if (!slotsInclude(available, dateKey, timeKey)) {
+      const {
+        pickReplacementSlots
+      } = require("./recruitingConfirmationBookingSafety");
+      const replacements = pickReplacementSlots(available, {
+        date: dateKey,
+        time: timeKey
+      });
       failed.push({
         type: V2_EXECUTABLE_ACTIONS.CREATE_APPOINTMENT,
         reason: REASON_CODES.EXECUTION_SLOT_STALE,
         dateKey,
-        timeKey
+        timeKey,
+        replacements
       });
       return finishCreateResult(
         {
@@ -849,7 +857,8 @@ async function executeAuthorizedSideEffects({
           failed,
           skipped,
           success: false,
-          reason: REASON_CODES.EXECUTION_SLOT_STALE
+          reason: REASON_CODES.EXECUTION_SLOT_STALE,
+          replacements
         },
         base
       );

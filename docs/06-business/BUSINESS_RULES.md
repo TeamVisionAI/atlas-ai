@@ -2977,7 +2977,10 @@ Production outside-window messaging requires firm-approved Meta templates config
 2. **SI-ask is confirmable** — A single concrete proposed date+time plus SI-confirm copy (or an equivalent one-slot selected state) is a confirmable proposal even if `lastQuestionAsked` was left as `offer_time_choices`. Multi-option menus stay non-confirmable until the prospect picks a time.
 3. **Final Si** — Bare `Si`/`Yes` after that ask creates the appointment (or returns an explicit real booking/provider failure). Generic `acknowledge_preference_awaiting_availability` (“Perfecto.”) is not an acceptable outcome.
 4. **One confirmation** — Successful create persists the appointment, marks scheduling complete, and sends one confirmation with the actual slot. Do not emit a second generic Perfecto for the same Si.
-5. **Boundaries** — Do not change tenant isolation, BR-185 lead time, WhatsApp routing, semantic settings, authoring/execution allowlists, or existing multi-slot menu rules.
+5. **Confirmation-time recheck** — On `schedule_confirm` while `lastQuestionAsked=confirm_slot`, re-read the exact selected slot from the same interviewer/calendar/tenant source before booking. Do not trust the earlier offer as current availability.
+6. **Slot taken** — If the selected slot is gone, do not book it, do not claim success, and do not keep asking SI for that slot. Persist fresh alternatives as the active offer and remain in scheduling ownership. If none exist, ask for another day/day-part (existing recovery). IUL booking stays on BR-219.
+7. **Timeout-safe recruiting create** — If create is still in flight when live authoring times out, wait a bounded late-settlement window. On late create success or a strictly matching concurrent appointment (same org, prospect, recruiter, date, local time, timezone, modality, active status, race window), send `appointment_confirmed` and do not duplicate. Unresolved execution with no DB evidence, or a definitive create failure, may still use `appointment_confirm_deferred`.
+8. **Boundaries** — Do not change tenant isolation, BR-185 lead time, WhatsApp routing, semantic settings, authoring/execution allowlists, existing multi-slot menu rules, or IUL BR-219 behavior.
 
 ---
 
