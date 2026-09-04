@@ -428,8 +428,52 @@ function stripLocationHedge(text) {
 const CORRECTION_OPENER =
   /^(digo|mejor dicho|en realidad|realmente|perd[oó]n|quise decir|me equivoqu[eé]|actually|i mean|sorry|correction)[,:]?\s*/i;
 
+/** Living / residence preambles — city/state follows (not start-anchored). */
+const LOCATION_LIVE_PREAMBLE =
+  "(?:vivo en|live in|i live in|estoy en|i(?:'?m| am) in|soy de|me encuentro en|estoy ubicad[oa]s? en|i(?:'?m| am) located in)";
+
+const LOCATION_LIVE_AT_START = new RegExp(
+  `^${LOCATION_LIVE_PREAMBLE}\\s+(.+)$`,
+  "i"
+);
+
+const LOCATION_LIVE_ANYWHERE = new RegExp(
+  `\\b${LOCATION_LIVE_PREAMBLE}\\s+(.+)$`,
+  "i"
+);
+
+const GREETING_PREFIX =
+  /^(?:hola|hi|hello|hey|buenos dias|buenas tardes|buenas noches|buenas)[\s,!.]+/i;
+
+const THANKS_PREFIX =
+  /^(?:(?:muchas\s+)?gracias|thanks|thank you)[\s,!.]+/i;
+
 /**
- * Strip correction / living preambles so "Digo, vivo en Doral" → "Doral".
+ * Implements BR-082 — drop leading greeting/thanks so a pending location
+ * answer can still expose the city token ("Hola gracias estoy en orlando").
+ */
+function stripPoliteLocationPrefix(text) {
+  let t = String(text || "").trim();
+  let changed = true;
+  while (changed && t) {
+    changed = false;
+    const greeting = t.match(GREETING_PREFIX);
+    if (greeting && greeting[0].length < t.length) {
+      t = t.slice(greeting[0].length).trim();
+      changed = true;
+    }
+    const thanks = t.match(THANKS_PREFIX);
+    if (thanks && thanks[0].length < t.length) {
+      t = t.slice(thanks[0].length).trim();
+      changed = true;
+    }
+  }
+  return t;
+}
+
+/**
+ * Strip correction / living preambles so "Digo, vivo en Doral" → "Doral"
+ * and mid-utterance "Hola gracias estoy en orlando" → "orlando" (BR-082).
  */
 function extractLocationCandidateText(text) {
   let t = String(text || "").trim();
@@ -452,12 +496,22 @@ function extractLocationCandidateText(text) {
     }
   }
 
-  const live = t.match(
-    /^(?:vivo en|live in|i live in|estoy en|i(?:'?m| am) in)\s+(.+)$/i
-  );
+  const afterPolite = stripPoliteLocationPrefix(t);
+  if (afterPolite && afterPolite !== t) {
+    t = afterPolite;
+  }
+
+  const live = t.match(LOCATION_LIVE_AT_START);
   if (live) {
     t = String(live[1] || "").trim();
     strippedCorrection = strippedCorrection || true;
+  } else {
+    // Implements BR-082 — "estoy en" / "vivo en" / "soy de" after greeting.
+    const mid = t.match(LOCATION_LIVE_ANYWHERE);
+    if (mid) {
+      t = String(mid[1] || "").trim();
+      strippedCorrection = strippedCorrection || true;
+    }
   }
 
   const bareEn = t.match(/^en\s+([A-Za-zÁÉÍÓÚÑáéíóúñ].+)$/i);
@@ -488,7 +542,7 @@ function looksLikeLocationCorrection(text) {
       return true;
     }
   }
-  return /^(vivo en|live in|i live in|estoy en)\b/i.test(raw);
+  return new RegExp(`^${LOCATION_LIVE_PREAMBLE}\\b`, "i").test(raw);
 }
 
 function isNonLocationRemainderAfterNo(remainder) {
