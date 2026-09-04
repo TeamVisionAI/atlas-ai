@@ -76,6 +76,7 @@ const knowledgeRoutes = require("./routes/knowledge");
 const platformStatusRoutes = require("./routes/platformStatus");
 const recruitingWorkflowRoutes = require("./routes/recruitingWorkflow");
 const facebookLeadWebhookRoute = require("./routes/facebookLeadWebhook");
+const createTikfinityLiveEventRouter = require("./routes/tikfinityLiveEvent");
 const { createBusinessEventModule } = require("./modules/business-events");
 const { createProjectionModule } = require("./modules/projections");
 const { createProspectModule } = require("./modules/prospects");
@@ -257,6 +258,7 @@ app.use("/api/agenda", agendaRoutes);
 app.use("/api/interview-assignment", interviewAssignmentRoutes);
 app.use("/api/qr-campaigns", require("./routes/qrCampaigns"));
 app.use("/api/campaign-intake-codes", require("./routes/campaignIntakeCodes"));
+app.use("/api/integrations/tikfinity", createTikfinityLiveEventRouter());
 app.use("/api/missions", missionRoutes);
 app.use("/api", quickCaptureRoutes);
 app.use(

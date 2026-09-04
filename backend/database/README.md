@@ -522,3 +522,14 @@ If tables already exist without RLS, the apply script runs `052_campaign_intake_
 
 Tests: `backend/test/campaignIntakeCodes.test.js`
 
+## BR-230 — TikTok LIVE engagements (migration 072)
+
+```
+backend/database/migrations/072_tiktok_live_engagements.sql
+backend/database/migrations/072_tiktok_live_engagements_down.sql
+```
+
+Creates `tiktok_live_engagements` with backend-only RLS (service role). No `prospect_id`. Do not apply from this PR.
+
+Tests: `backend/test/tikfinityLiveEventBridge.test.js`
+
