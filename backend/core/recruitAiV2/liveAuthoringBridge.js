@@ -1109,11 +1109,17 @@ async function attemptLiveV2Authoring({
         }).catch(() => null);
 
   const tenantOffice = await hydrateTenantOfficeIdentity(organizationId, dependencies);
+  const { loadTenantCoverageCities } = require("../recruitingCoverage");
+  const tenantCoverage = await loadTenantCoverageCities(organizationId, {
+    getRecruitingConfig: dependencies.getRecruitingConfig
+  });
   const contextInput = buildReconstructionInput(prospect, {
     organizationId,
     organizationName: tenantOffice.organizationName,
     officeAddress: tenantOffice.officeAddress,
     officeAddressSource: tenantOffice.officeAddressSource,
+    localCities: tenantCoverage.localCities,
+    coverageCitiesSource: tenantCoverage.coverageCitiesSource,
     prospectId: canonicalProspectId,
     prospectPhone,
     legacyProspectId,

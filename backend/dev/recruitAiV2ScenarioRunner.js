@@ -195,6 +195,33 @@ function evaluateExpect(actual, expect = {}) {
   return { pass: failures.length === 0, failures };
 }
 
+function resolveSimulatorCoverage(seed = {}) {
+  const { TEAM_VISION_ORGANIZATION_ID } = require("../core/teamVisionSeedTenant");
+  const { LOCAL_CITIES } = require("../core/localAreaConfig");
+  const { COVERAGE_CITY_SOURCES } = require("../core/recruitingCoverage");
+  if (Object.prototype.hasOwnProperty.call(seed, "localCities")) {
+    return {
+      localCities: seed.localCities,
+      coverageCitiesSource:
+        seed.coverageCitiesSource || COVERAGE_CITY_SOURCES.RECRUITING_CONFIG
+    };
+  }
+  const organizationId = seed.organizationId || "sim-org-team-vision";
+  if (
+    organizationId === TEAM_VISION_ORGANIZATION_ID ||
+    organizationId === "sim-org-team-vision"
+  ) {
+    return {
+      localCities: [...LOCAL_CITIES],
+      coverageCitiesSource: COVERAGE_CITY_SOURCES.TEAM_VISION_SEED
+    };
+  }
+  return {
+    localCities: [],
+    coverageCitiesSource: COVERAGE_CITY_SOURCES.UNAVAILABLE
+  };
+}
+
 function resolveSimulatorOfficeIdentity(seed = {}) {
   const { TEAM_VISION_ORGANIZATION_ID } = require("../core/teamVisionSeedTenant");
   const { getOfficeLocation } = require("../core/businessRulesEngine");
@@ -225,6 +252,7 @@ function createEphemeralSession(seed = {}) {
   assertSafeSimulatorIdentity(seed);
   const organizationId = seed.organizationId || "sim-org-team-vision";
   const office = resolveSimulatorOfficeIdentity({ ...seed, organizationId });
+  const coverage = resolveSimulatorCoverage({ ...seed, organizationId });
 
   const context = createConversationContext({
     prospectId: seed.prospectId,
@@ -232,6 +260,8 @@ function createEphemeralSession(seed = {}) {
     organizationName: seed.organizationName || null,
     officeAddress: office.officeAddress,
     officeAddressSource: office.officeAddressSource,
+    localCities: coverage.localCities,
+    coverageCitiesSource: coverage.coverageCitiesSource,
     preferredLanguage: seed.preferredLanguage || "english",
     languageMeta: seed.languageMeta || { source: seed.languageSource || "inferred" },
     timezone: seed.timezone || "America/New_York",

@@ -7,12 +7,12 @@ function normalize(value = "") {
   return String(value).trim().toLowerCase();
 }
 
-function determineInterviewType(city = "") {
-  return evaluateCoverage({ city }).defaultInterviewType;
+function determineInterviewType(city = "", coverageOptions = {}) {
+  return evaluateCoverage({ city, ...coverageOptions }).defaultInterviewType;
 }
 
-function isInOfficeCoverage(city = "") {
-  return evaluateCoverage({ city }).coverage === "LOCAL";
+function isInOfficeCoverage(city = "", coverageOptions = {}) {
+  return evaluateCoverage({ city, ...coverageOptions }).coverage === "LOCAL";
 }
 
 function evaluateCandidate(candidate = {}) {
@@ -20,7 +20,11 @@ function evaluateCandidate(candidate = {}) {
     candidate.workStatus || candidate.workAuthorization
   );
 
-  const interviewType = determineInterviewType(candidate.city);
+  const interviewType = determineInterviewType(candidate.city, {
+    organizationId: candidate.organizationId || candidate.organization_id || null,
+    localCities: candidate.localCities,
+    coverageCitiesSource: candidate.coverageCitiesSource || null
+  });
 
   return {
     qualified: workAuthorization.qualified,

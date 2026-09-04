@@ -1,14 +1,12 @@
 const { evaluateCoverage } = require("./businessRulesEngine");
+const { coverageInputFromProfile } = require("./recruitingCoverage");
 const {
   getOutsideAreaZoomIntro,
   getLocalInterviewChoiceQuestion
 } = require("./teamVisionAppointmentRules");
 
 function buildInterviewPreferenceQuestion(profile, language) {
-  const coverage = evaluateCoverage({
-    city: profile?.city,
-    state: profile?.state
-  });
+  const coverage = evaluateCoverage(coverageInputFromProfile(profile));
 
   if (coverage.coverage === "LOCAL") {
     return getLocalInterviewChoiceQuestion(language);
@@ -18,10 +16,7 @@ function buildInterviewPreferenceQuestion(profile, language) {
 }
 
 function buildCoverageScheduleIntro(profile, language) {
-  const coverage = evaluateCoverage({
-    city: profile?.city,
-    state: profile?.state
-  });
+  const coverage = evaluateCoverage(coverageInputFromProfile(profile));
 
   if (coverage.coverage === "LOCAL") {
     return "";

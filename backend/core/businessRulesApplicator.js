@@ -15,7 +15,10 @@ function applyBusinessRulesToProfile(profile, message = "", extractedType = null
     state: profile.state,
     requestedType: explicitRequest,
     currentType: profile.interviewType,
-    message
+    message,
+    organizationId: profile.organizationId || profile.organization_id || null,
+    localCities: profile.localCities,
+    coverageCitiesSource: profile.coverageCitiesSource || null
   });
 
   if (typeDecision.needsHumanCoordinator) {

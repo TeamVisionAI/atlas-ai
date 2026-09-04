@@ -78,6 +78,8 @@ function buildReconstructionInput(prospect = {}, extras = {}) {
     organizationName: extras.organizationName || prospect.organizationName || null,
     officeAddress: extras.officeAddress || null,
     officeAddressSource: extras.officeAddressSource || null,
+    localCities: extras.localCities,
+    coverageCitiesSource: extras.coverageCitiesSource || null,
     prospectId: extras.prospectId || prospect.id || null,
     // Implements BR-120 — phone + legacy enable dual-load of durable context.
     prospectPhone: extras.prospectPhone || prospect.phone || null,

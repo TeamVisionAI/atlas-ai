@@ -25,7 +25,11 @@ const OFFICE_LOCATION = {
   fullAddress: "2500 NW 79th Ave, Suite 189, Doral, FL 33122"
 };
 
-const { isLocalTeamVisionCity, LOCAL_CITIES } = require("./localAreaConfig");
+const {
+  resolveCoverageCities,
+  isLocalCoverageCity
+} = require("./recruitingCoverage");
+const { isTeamVisionSeedTenant } = require("./teamVisionSeedTenant");
 
 const LOCAL_RADIUS_MILES = 25;
 
@@ -60,21 +64,36 @@ function getOfficeLocation() {
   return { ...OFFICE_LOCATION };
 }
 
-function isLocalCity(city = "") {
-  return isLocalTeamVisionCity(city);
+function isLocalCity(city = "", coverageOptions = {}) {
+  const resolved = resolveCoverageCities(coverageOptions);
+  return isLocalCoverageCity(city, resolved.cities);
 }
 
-function evaluateCoverage({ city, state = null }) {
+function evaluateCoverage({
+  city,
+  state = null,
+  organizationId = null,
+  localCities = undefined,
+  coverageCitiesSource = null
+} = {}) {
   void state;
 
-  const isLocal = isLocalCity(city);
+  const resolved = resolveCoverageCities({
+    organizationId,
+    localCities,
+    coverageCitiesSource
+  });
+  const isLocal = isLocalCoverageCity(city, resolved.cities);
 
   return {
     coverage: isLocal ? COVERAGE.LOCAL : COVERAGE.OUTSIDE,
     defaultInterviewType: INTERVIEW_TYPES.ZOOM,
-    officeLocation: isLocal ? getOfficeLocation() : null,
+    officeLocation:
+      isLocal && isTeamVisionSeedTenant(organizationId) ? getOfficeLocation() : null,
     messageKey: "ZOOM_DEFAULT",
-    localRadiusMiles: LOCAL_RADIUS_MILES
+    localRadiusMiles: LOCAL_RADIUS_MILES,
+    coverageCitiesSource: resolved.source,
+    localCities: resolved.cities
   };
 }
 
@@ -120,9 +139,18 @@ function evaluateInterviewTypeDecision({
   state = null,
   requestedType = null,
   currentType = null,
-  message = ""
+  message = "",
+  organizationId = null,
+  localCities = undefined,
+  coverageCitiesSource = null
 }) {
-  const coverageDecision = evaluateCoverage({ city, state });
+  const coverageDecision = evaluateCoverage({
+    city,
+    state,
+    organizationId,
+    localCities,
+    coverageCitiesSource
+  });
   const explicitRequest = requestedType || detectRequestedInterviewType(message);
 
   if (explicitRequest === "UNUSUAL_METHOD") {
@@ -287,8 +315,22 @@ function evaluateOccupationScheduling({ occupation = null, message = "" }) {
   };
 }
 
-function evaluateSchedulingApproach({ city, state = null, occupation = null, message = "" }) {
-  const coverageDecision = evaluateCoverage({ city, state });
+function evaluateSchedulingApproach({
+  city,
+  state = null,
+  occupation = null,
+  message = "",
+  organizationId = null,
+  localCities = undefined,
+  coverageCitiesSource = null
+}) {
+  const coverageDecision = evaluateCoverage({
+    city,
+    state,
+    organizationId,
+    localCities,
+    coverageCitiesSource
+  });
   const occupationDecision = evaluateOccupationScheduling({ occupation, message });
 
   return {

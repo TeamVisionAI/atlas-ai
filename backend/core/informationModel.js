@@ -3,6 +3,7 @@ const {
   evaluateInterviewTypeDecision,
   evaluateCoverage
 } = require("./businessRulesEngine");
+const { coverageInputFromProfile } = require("./recruitingCoverage");
 const { applyBusinessRulesToProfile } = require("./businessRulesApplicator");
 const {
   defaultCaptureState,
@@ -126,7 +127,10 @@ function buildProfileFromProspect(prospect, channel = "whatsapp") {
     calendarEventId: prospect.calendar_event_id || null,
     confirmed: Boolean(prospect.calendar_event_id),
     channel,
-    schedulingPhase: prospect.appointment_type || null
+    schedulingPhase: prospect.appointment_type || null,
+    organizationId: prospect.organization_id || prospect.organizationId || null,
+    localCities: prospect.localCities || null,
+    coverageCitiesSource: prospect.coverageCitiesSource || null
   };
 }
 
@@ -146,7 +150,10 @@ function createEmptyProfile(channel = "whatsapp") {
     calendarEventId: null,
     confirmed: false,
     channel,
-    schedulingPhase: null
+    schedulingPhase: null,
+    organizationId: null,
+    localCities: null,
+    coverageCitiesSource: null
   };
 }
 
@@ -176,8 +183,7 @@ function mergeProfile(existing, extracted, options = {}) {
 
 function resolveInterviewTypeDecision(profile, message = "") {
   return evaluateInterviewTypeDecision({
-    city: profile.city,
-    state: profile.state,
+    ...coverageInputFromProfile(profile),
     requestedType: profile.interviewType,
     currentType: profile.interviewType,
     message
@@ -205,8 +211,7 @@ function getEffectiveInterviewType(profile, message = "", options = {}) {
   }
 
   const decision = evaluateInterviewTypeDecision({
-    city: profile.city,
-    state: profile.state,
+    ...coverageInputFromProfile(profile, options),
     currentType: null,
     message
   });
@@ -339,7 +344,9 @@ function resolveIsLocal(profile) {
     return null;
   }
 
-  return evaluateCoverage({ city: profile.city, state: profile.state }).coverage === "LOCAL";
+  return (
+    evaluateCoverage(coverageInputFromProfile(profile)).coverage === "LOCAL"
+  );
 }
 
 function buildQualificationBrain(prospect, options = {}) {

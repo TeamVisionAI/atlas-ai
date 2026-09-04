@@ -510,7 +510,12 @@ function buildSuggestedQualificationDefaults(prospect, profile, brain, draft = {
       city,
       state: inferredState || profile.state,
       currentType: null,
-      message: ""
+      message: "",
+      organizationId:
+        prospect.organization_id || prospect.organizationId || profile.organizationId || null,
+      localCities: prospect.localCities || profile.localCities,
+      coverageCitiesSource:
+        prospect.coverageCitiesSource || profile.coverageCitiesSource || null
     });
     interviewType = decision.interviewType || null;
   }

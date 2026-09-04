@@ -67,7 +67,12 @@ async function getMissionControlState(phone, options = {}) {
   const { emailRequired } = require("./informationModel");
   const coverage = evaluateCoverage({
     city: ruledProfile.city,
-    state: ruledProfile.state
+    state: ruledProfile.state,
+    organizationId:
+      prospect.organization_id || prospect.organizationId || options.organizationId || null,
+    localCities: prospect.localCities || ruledProfile.localCities,
+    coverageCitiesSource:
+      prospect.coverageCitiesSource || ruledProfile.coverageCitiesSource || null
   });
   const requiresEmail = emailRequired({
     ...ruledProfile,

@@ -47,6 +47,7 @@ const {
   STAGES
 } = require("./conversationContext");
 const { evaluateCoverage } = require("../businessRulesEngine");
+const { coverageInputFromContext } = require("../recruitingCoverage");
 const { extractOfficeCity } = require("../officeAddressResolver");
 const {
   WORK_AUTHORIZATION,
@@ -760,7 +761,12 @@ function resolveQualificationResume(context) {
   // BR-087 — do not re-ask day-part when slot/constraint already known.
   // resolveQualificationResume only has knownFacts; callers with full context
   // use resolveSchedulingQuestionSkip separately.
-  const modality = resolveMeetingModalityForLocation(facts);
+  const modality = resolveMeetingModalityForLocation({
+    ...facts,
+    organizationId: context.organizationId,
+    localCities: context.localCities,
+    coverageCitiesSource: context.coverageCitiesSource
+  });
   if (modality.coverage === "OUTSIDE") {
     return {
       templateKey: "outside_zoom_day_part",
@@ -797,7 +803,10 @@ function resolveQualificationResume(context) {
 function resolveMeetingModalityForLocation(facts = {}) {
   const coverage = evaluateCoverage({
     city: facts.city,
-    state: facts.state
+    state: facts.state,
+    organizationId: facts.organizationId || null,
+    localCities: facts.localCities,
+    coverageCitiesSource: facts.coverageCitiesSource || null
   });
   const outside = coverage.coverage === "OUTSIDE";
   const source = facts.meetingPreferenceSource || null;
@@ -1969,11 +1978,13 @@ function decideConversationTurnCore({
     structured.reasonCodes.push(REASON_CODES.PENDING_QUESTION_DEFERRED);
 
     if (complete) {
-      const modality = resolveMeetingModalityForLocation({
-        ...context.knownFacts,
-        city,
-        state
-      });
+      const modality = resolveMeetingModalityForLocation(
+        coverageInputFromContext(context, {
+          ...context.knownFacts,
+          city,
+          state
+        })
+      );
       const nextFacts = {
         ...context.knownFacts,
         city,
@@ -2151,7 +2162,9 @@ function decideConversationTurnCore({
       return structured;
     }
 
-    const modality = resolveMeetingModalityForLocation(context.knownFacts || {});
+    const modality = resolveMeetingModalityForLocation(
+      coverageInputFromContext(context, context.knownFacts || {})
+    );
     const outside = modality.coverage === "OUTSIDE";
     const templateKey =
       outside || modality.meetingType === "zoom"
@@ -2288,7 +2301,9 @@ function decideConversationTurnCore({
       return structured;
     }
 
-    const modality = resolveMeetingModalityForLocation({ city, state });
+    const modality = resolveMeetingModalityForLocation(
+      coverageInputFromContext(context, { city, state })
+    );
     structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
     structured.customerReplyPlan.templateKey = "continue_qualification_after_location";
     structured.contextPatch = {
@@ -2489,10 +2504,12 @@ function decideConversationTurnCore({
       context.knownFacts?.city && context.knownFacts?.state
     );
     const coverageEval = hasLocation
-      ? evaluateCoverage({
-          city: context.knownFacts.city,
-          state: context.knownFacts.state
-        })
+      ? evaluateCoverage(
+          coverageInputFromContext(context, {
+            city: context.knownFacts.city,
+            state: context.knownFacts.state
+          })
+        )
       : null;
     // Only require travel confirm when coverage is known OUTSIDE (not unknown location).
     const outsideCoverage =
