@@ -74,6 +74,25 @@ function nowIso(now) {
   return new Date(now || Date.now()).toISOString();
 }
 
+function buildActionableMediaOrFilter({ now = Date.now(), staleMs = 5 * 60 * 1000 } = {}) {
+  const staleIso = new Date(Number(now) - Number(staleMs)).toISOString();
+  return [
+    "fetch_status.eq.pending",
+    `and(fetch_status.eq.fetching,updated_at.lt.${staleIso})`,
+    "and(fetch_status.eq.stored,transcode_status.eq.pending)",
+    "and(fetch_status.eq.stored,transcode_status.eq.processing)",
+    "and(fetch_status.eq.stored,transcode_status.in.(ready,not_required),transcript_status.is.null)",
+    "and(fetch_status.eq.stored,transcode_status.in.(ready,not_required),transcript_status.eq.pending)",
+    "and(fetch_status.eq.stored,transcode_status.in.(ready,not_required),transcript_status.eq.processing)",
+    "and(fetch_status.eq.stored,transcode_status.eq.failed,transcript_status.is.null)",
+    "and(fetch_status.eq.stored,transcode_status.eq.failed,transcript_status.eq.pending)",
+    "and(fetch_status.eq.stored,transcode_status.eq.failed,transcript_status.eq.processing)",
+    "and(fetch_status.eq.failed,transcript_status.is.null)",
+    "and(fetch_status.eq.failed,transcript_status.eq.pending)",
+    "and(fetch_status.eq.failed,transcript_status.eq.processing)"
+  ].join(",");
+}
+
 function toRow(input = {}) {
   const created = nowIso(input.now);
   return {
@@ -457,17 +476,14 @@ function createSupabaseCommunicationMediaRepository() {
       return data || [];
     },
     async listPending({ limit = 20, now = Date.now(), staleMs = 5 * 60 * 1000 } = {}) {
+      // Implements BR-228 — select actionable rows in SQL so completed history
+      // cannot starve newer pending voice notes.
       const { data, error } = await getSupabase()
         .from("communication_media")
         .select("*")
-        .in("fetch_status", [
-          FETCH_STATUS.PENDING,
-          FETCH_STATUS.FETCHING,
-          FETCH_STATUS.STORED,
-          FETCH_STATUS.FAILED
-        ])
+        .or(buildActionableMediaOrFilter({ now, staleMs }))
         .order("updated_at", { ascending: true })
-        .limit(Math.max(limit * 4, 40));
+        .limit(Math.max(1, Number(limit) || 20));
 
       if (error) {
         if (isMissingTableError(error)) {
@@ -613,6 +629,7 @@ module.exports = {
   toPublicMedia,
   attachPublicMediaToConversationMessages,
   rowNeedsPollerWork,
+  buildActionableMediaOrFilter,
   createMemoryCommunicationMediaRepository,
   createSupabaseCommunicationMediaRepository,
   getCommunicationMediaRepository

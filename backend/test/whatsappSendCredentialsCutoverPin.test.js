@@ -376,7 +376,8 @@ test("media-fetch source still resolves through whatsappSendCredentials", () => 
   );
   const pinSrc = fs.readFileSync(path.join(__dirname, "../core/whatsappSendCredentials.js"), "utf8");
 
-  assert.match(fetchSrc, /resolveWhatsAppSendCredentials/);
+  assert.match(fetchSrc, /resolveWhatsAppMediaFetchCredentials/);
+  assert.match(pinSrc, /resolveWhatsAppMediaFetchCredentials/);
   assert.match(outboundSrc, /resolveWhatsAppSendCredentials/);
   assert.match(outboundSrc, /inboundPhoneNumberId/);
   assert.match(pinSrc, /findConnectionByPhoneNumberId/);
