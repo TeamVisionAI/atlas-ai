@@ -609,3 +609,33 @@ test("aggregator: recruiting burst deadline does not extend on second fragment",
 
   resetInboundBurstAggregationForTests();
 });
+
+test("BR-229: CTWA first-turn is burst-eligible without a campaign code", () => {
+  assert.equal(
+    isRecruitingCampaignIntakeFirstTurnBurst({
+      atlasEligibilitySource: "CTWA_REFERRAL",
+      hasDeliveredAutomatedOutbound: false
+    }),
+    true
+  );
+  assert.equal(
+    looksLikeRecruitingFirstTurnSupplement("Hola me.interesa wn busca de trabajo"),
+    true
+  );
+});
+
+test("BR-229: late CTWA supplement skipped without campaignIntakeMatch", () => {
+  assert.equal(
+    shouldSkipDuplicateRecruitingFirstTurnReply({
+      campaignIntakeMatch: null,
+      hasDeliveredAutomatedOutbound: true,
+      workflowState: {
+        atlasEligibilitySource: "CTWA_REFERRAL",
+        canonicalMilestone: "GREETING_SENT",
+        conversation: { lastQuestionAsked: "ask_location" }
+      },
+      semanticBody: "Hola me.interesa wn busca de trabajo"
+    }),
+    true
+  );
+});

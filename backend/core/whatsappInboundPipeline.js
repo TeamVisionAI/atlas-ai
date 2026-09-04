@@ -42,7 +42,10 @@ const {
 } = require("./whatsappSenderIdentity");
 const {
   isRecruitingCampaignIntakeFirstTurnBurst,
-  shouldSkipDuplicateRecruitingFirstTurnReply
+  shouldSkipDuplicateRecruitingFirstTurnReply,
+  markRecruitingFirstTurnInFlight,
+  clearRecruitingFirstTurnInFlight,
+  isRecruitingFirstTurnInFlight
 } = require("./recruitingFirstTurnBurst");
 const {
   maybeCreateUnsupportedInboundReview,
@@ -744,11 +747,23 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   const hasDeliveredAutomatedOutbound =
     dependencies.prospectHasDeliveredAutomatedOutbound ||
     prospectHasDeliveredAutomatedOutbound;
-  const recruitingFirstTurnBurst = isRecruitingCampaignIntakeFirstTurnBurst({
+  const recruitingOrgId =
+    organizationId || prospect?.organization_id || claimedOrganizationId || null;
+  const recruitingBurstHints = {
     campaignIntakeMatch: campaignIntakeMatch?.matched ? campaignIntakeMatch : null,
+    atlasEligibilitySource:
+      prospect?.workflow_state?.atlasEligibilitySource || null,
+    ctwaReferral:
+      inbound.ctwaReferral ||
+      prospect?.workflow_state?.ctwaReferral ||
+      null,
+    workflowState: prospect?.workflow_state || null
+  };
+  const recruitingFirstTurnBurst = isRecruitingCampaignIntakeFirstTurnBurst({
+    ...recruitingBurstHints,
     hasDeliveredAutomatedOutbound: await hasDeliveredAutomatedOutbound(
       storagePhone,
-      organizationId || prospect?.organization_id || claimedOrganizationId || null
+      recruitingOrgId
     )
   });
 
@@ -793,13 +808,17 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
         }).catch(() => null)
       : null;
     const skipDuplicateFirstTurn = shouldSkipDuplicateRecruitingFirstTurnReply({
-      campaignIntakeMatch: automationInbound.campaignIntakeMatch,
+      campaignIntakeMatch:
+        automationInbound.campaignIntakeMatch || recruitingBurstHints.campaignIntakeMatch,
       hasDeliveredAutomatedOutbound: await hasDeliveredAutomatedOutbound(
         storagePhone,
-        organizationId || prospect?.organization_id || claimedOrganizationId || null
+        recruitingOrgId
       ),
-      workflowState,
-      semanticBody: automationInbound.body || semanticBody
+      firstTurnInFlight: isRecruitingFirstTurnInFlight(storagePhone, recruitingOrgId),
+      workflowState: workflowState || recruitingBurstHints.workflowState,
+      semanticBody: automationInbound.body || semanticBody,
+      atlasEligibilitySource: recruitingBurstHints.atlasEligibilitySource,
+      ctwaReferral: recruitingBurstHints.ctwaReferral
     });
     if (skipDuplicateFirstTurn) {
       logWhatsAppStage("recruiting_first_turn_burst_dedup_skipped", {
@@ -816,6 +835,10 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
         conversationLogId: logResult.log?.id || null
       };
     }
+  }
+
+  if (recruitingFirstTurnBurst) {
+    markRecruitingFirstTurnInFlight(storagePhone, recruitingOrgId);
   }
 
   try {
@@ -843,7 +866,13 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   }
 
   // Implements BR-080 — only mark AI responding after a real outbound delivery.
-  await applyInboundAttentionUpdate(prospect, conversation, semanticBody);
+  try {
+    await applyInboundAttentionUpdate(prospect, conversation, semanticBody);
+  } finally {
+    if (recruitingFirstTurnBurst) {
+      clearRecruitingFirstTurnInFlight(storagePhone, recruitingOrgId);
+    }
+  }
 
   // Implements BR-081 Phase 3B — post-live advisory:
   // continuous context capture (flag-gated, target 100%) + shadow eval (10%).

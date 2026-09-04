@@ -20,8 +20,12 @@ const {
   looksLikeSpanishInfoRequest,
   looksLikeEnglishInfoRequest,
   looksLikeJobOverviewQuestion,
-  looksLikeJobOpportunityQuestion
+  looksLikeJobOpportunityQuestion,
+  looksLikeOfficeLocationQuestion,
+  looksLikeNearbyLocationPreference,
+  looksLikeClarifiableNonresponsiveInput
 } = require("./conversationContinuity");
+const { isBareConversationalYes } = require("../languageLibrary");
 const {
   shouldSoftInviteInterview,
   isQualificationCompleteForInterview
@@ -127,6 +131,91 @@ function applyMissedJobFaq(structured, context, interpretation) {
   structured.reasonCodes.push(REASON_CODES.JOB_OVERVIEW_FAQ);
   structured.reasonCodes.push(REASON_CODES.FAQ_RESUME_NEXT_UNRESOLVED);
   return true;
+}
+
+function applyMissedOfficeLocationFaq(structured, context, interpretation) {
+  const text = inboundTextFromInterpretation(interpretation);
+  if (
+    interpretation?.intent !== INTENTS.OFFICE_LOCATION_QUESTION &&
+    !looksLikeOfficeLocationQuestion(text) &&
+    !looksLikeNearbyLocationPreference(text)
+  ) {
+    return false;
+  }
+  buildFaqResumeDecision(
+    structured,
+    context,
+    INTENTS.OFFICE_LOCATION_QUESTION,
+    "office_location_faq_then_resume",
+    interpretation
+  );
+  structured.decision.nextAction = NEXT_ACTIONS.ANSWER_OFFICE_LOCATION_THEN_RESUME;
+  structured.decision.shouldEscalate = false;
+  structured.reasonCodes.push(REASON_CODES.OFFICE_LOCATION_FAQ);
+  structured.reasonCodes.push(REASON_CODES.LOCATION_PREFERENCE_NOT_HANDOFF);
+  structured.reasonCodes.push(REASON_CODES.FAQ_RESUME_NEXT_UNRESOLVED);
+  structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    nearbyCityPreference: interpretation?.entities?.nearbyCityPreference || null,
+    preserveKnownLocation: true,
+    locationPreferenceOnly: true,
+    city: context.knownFacts?.city || null,
+    state: context.knownFacts?.state || null,
+    organizationId: context.organizationId || null,
+    organizationName: context.organizationName || null
+  };
+  return true;
+}
+
+/** Implements BR-229 — do not emit generic pending-data copy for known continuity. */
+function applyPendingContinuityInsteadOfClarify(structured, context, interpretation) {
+  if (applyMissedJobFaq(structured, context, interpretation)) {
+    return true;
+  }
+  if (applyMissedOfficeLocationFaq(structured, context, interpretation)) {
+    return true;
+  }
+  const text = inboundTextFromInterpretation(interpretation);
+  const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+  if (
+    lastQ === "ask_authorization" &&
+    isBareConversationalYes(text) &&
+    context?.knownFacts?.workAuthorization !== true &&
+    context?.knownFacts?.workAuthorization !== false
+  ) {
+    structured.reasonCodes.push(REASON_CODES.PENDING_ANSWER_REJECTED);
+    structured.decision.nextAction = NEXT_ACTIONS.CONTINUE_QUALIFICATION;
+    structured.decision.shouldEscalate = false;
+    structured.customerReplyPlan.acknowledgeRequest = true;
+    structured.customerReplyPlan.templateKey =
+      "continue_qualification_after_authorization";
+    structured.customerReplyPlan.entities = {
+      ...structured.customerReplyPlan.entities,
+      city: context.knownFacts?.city || null,
+      state: context.knownFacts?.state || null,
+      workAuthorization: true,
+      workAuthorizationStatus: WORK_AUTHORIZATION.AUTHORIZED,
+      organizationId: context.organizationId || null,
+      organizationName: context.organizationName || null
+    };
+    structured.reasonCodes.push(REASON_CODES.AUTHORIZATION_CAPTURED);
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.contextPatch = {
+      knownFacts: {
+        workAuthorization: true,
+        workAuthorizationStatus: WORK_AUTHORIZATION.AUTHORIZED
+      },
+      conversation: {
+        lastQuestionAsked: "ask_day_part",
+        lastProspectIntent: INTENTS.PROVIDE_AUTHORIZATION,
+        clarificationCount: 0,
+        pendingClarification: null
+      }
+    };
+    return true;
+  }
+  return false;
 }
 
 /** Implements BR-164 — every turn must declare respond|wait|suppress + reason. */
@@ -1405,6 +1494,12 @@ function decideConversationTurnCore({
       }
     };
     return structured;
+  }
+
+  if (intent === INTENTS.OFFICE_LOCATION_QUESTION) {
+    if (applyMissedOfficeLocationFaq(structured, context, interpretation)) {
+      return structured;
+    }
   }
 
   if (
@@ -3865,21 +3960,29 @@ function decideConversationTurnCore({
   // Recoverable unknown — clarify first; escalate only after repeats.
   // Never use human-handoff copy for ordinary mid-flow unknowns on first pass.
   // BR-131 — first-turn with no prior Atlas question cannot use resume/clarify_once.
+  // BR-229 — FAQ / office / pending answers must not hit generic pending-data copy.
   if (interpretation.confidence < 0.5) {
     if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
       return structured;
     }
-    if (applyMissedJobFaq(structured, context, interpretation)) {
+    if (applyPendingContinuityInsteadOfClarify(structured, context, interpretation)) {
       return structured;
     }
     structured.reasonCodes.push(REASON_CODES.RECOVERABLE_AMBIGUITY);
-    if (shouldEscalateAfterClarifications(context)) {
+    const inboundText = inboundTextFromInterpretation(interpretation);
+    const continuityBlocksHandoff =
+      looksLikeOfficeLocationQuestion(inboundText) ||
+      looksLikeNearbyLocationPreference(inboundText) ||
+      looksLikeJobOpportunityQuestion(inboundText);
+    if (shouldEscalateAfterClarifications(context) && !continuityBlocksHandoff) {
       structured.decision.nextAction = NEXT_ACTIONS.ESCALATE_TO_HUMAN;
       structured.decision.shouldEscalate = true;
       structured.customerReplyPlan.templateKey = "safe_uncertain_escalate";
       structured.customerReplyPlan.entities = {
         ...structured.customerReplyPlan.entities,
-        requiresHuman: true
+        requiresHuman: true,
+        organizationId: context.organizationId || null,
+        organizationName: context.organizationName || null
       };
       structured.reasonCodes.push(REASON_CODES.LOW_CONFIDENCE);
       structured.reasonCodes.push(REASON_CODES.REPEATED_AMBIGUITY_ESCALATE);
@@ -3891,6 +3994,25 @@ function decideConversationTurnCore({
         },
         currentStage: STAGES.HUMAN_REQUIRED,
         conversation: bumpClarification(context, "safe_uncertain_escalate")
+      };
+      return structured;
+    }
+    if (continuityBlocksHandoff) {
+      structured.reasonCodes.push(REASON_CODES.PREMATURE_HANDOFF);
+    }
+
+    if (!looksLikeClarifiableNonresponsiveInput(inboundText)) {
+      const resume = resolvePendingResume(context);
+      structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
+      structured.decision.shouldEscalate = false;
+      structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+      structured.customerReplyPlan.templateKey =
+        resume.templateKey || "explain_pending_day_part";
+      structured.contextPatch = {
+        conversation: {
+          lastQuestionAsked: resume.lastQuestionAsked || context.conversation?.lastQuestionAsked,
+          lastProspectIntent: intent
+        }
       };
       return structured;
     }
@@ -3911,7 +4033,18 @@ function decideConversationTurnCore({
   if (applyFirstTurnWhenNoPriorAtlasQuestion(structured, context, interpretation)) {
     return structured;
   }
-  if (applyMissedJobFaq(structured, context, interpretation)) {
+  if (applyPendingContinuityInsteadOfClarify(structured, context, interpretation)) {
+    return structured;
+  }
+
+  const inboundText = inboundTextFromInterpretation(interpretation);
+  if (!looksLikeClarifiableNonresponsiveInput(inboundText)) {
+    const resume = resolvePendingResume(context);
+    structured.decision.nextAction = NEXT_ACTIONS.CLARIFY_ONCE;
+    structured.decision.shouldEscalate = false;
+    structured.reasonCodes.push(REASON_CODES.HANDOFF_GUARD_SKIPPED);
+    structured.customerReplyPlan.templateKey =
+      resume.templateKey || "explain_pending_day_part";
     return structured;
   }
 

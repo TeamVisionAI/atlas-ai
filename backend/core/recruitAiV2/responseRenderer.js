@@ -5,6 +5,8 @@
  */
 
 const { LANGUAGES } = require("./constants");
+const { getOfficeLocation } = require("../businessRulesEngine");
+const { isTeamVisionSeedTenant } = require("../teamVisionSeedTenant");
 const { renderIulAdReply } = require("./iulAdConversation");
 const { sanitizeCustomerCopy } = require("./sanitize");
 const { collapseRedundantAcknowledgements } = require("./acknowledgementStyle");
@@ -670,6 +672,62 @@ function composeJobOpportunityThenResume(language, entities = {}) {
 }
 
 /** BR-097 first-turn short overview; BR-196 explicit job FAQ mid-qualification. */
+function resolveTenantOfficeAddress(entities = {}) {
+  if (entities.officeAddress) {
+    return String(entities.officeAddress).trim();
+  }
+  if (isTeamVisionSeedTenant(entities.organizationId)) {
+    return getOfficeLocation().fullAddress;
+  }
+  return null;
+}
+
+function composeOfficeLocationThenResume(language, entities = {}) {
+  const lang = localeCode(language);
+  const office = resolveTenantOfficeAddress(entities);
+  const nearby = entities.nearbyCityPreference
+    ? String(entities.nearbyCityPreference).trim()
+    : "";
+  let faqText;
+  if (office) {
+    faqText =
+      lang === "es"
+        ? `Nuestras oficinas están en ${office}.`
+        : `Our offices are at ${office}.`;
+    if (nearby) {
+      faqText =
+        lang === "es"
+          ? `${faqText} Si buscas algo cerca de ${nearby}, te confirmo si esa zona entra en cobertura.`
+          : `${faqText} If you want something near ${nearby}, I can confirm whether that area is in coverage.`;
+    }
+  } else {
+    faqText =
+      lang === "es"
+        ? "Con gusto te confirmo la ubicación de nuestras oficinas."
+        : "I can confirm our office location for you.";
+  }
+  return composeFaqThenResume(faqText, language, entities);
+}
+
+function applyTenantSafeTeamLabel(text, language, entities = {}) {
+  const raw = String(text || "");
+  if (!/Team Vision/i.test(raw)) {
+    return raw;
+  }
+  if (isTeamVisionSeedTenant(entities.organizationId)) {
+    return raw;
+  }
+  if (localeCode(language) === "es") {
+    return raw
+      .replace(/\s*de Team Vision\s*/gi, " ")
+      .replace(/\s*Team Vision\s*/gi, " ")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+te /g, " te ")
+      .trim();
+  }
+  return raw.replace(/\s*Team Vision\s*/gi, " ").replace(/\s{2,}/g, " ").trim();
+}
+
 function composeJobOverviewThenResume(language, entities = {}) {
   const lang = localeCode(language);
   const firstTouch = getAdLeadFirstTouchMessage(lang, entities);
@@ -768,6 +826,8 @@ function renderCustomerReply(responsePlan) {
     template = getStateQuestion(city === "there" ? null : city, lang, {});
   } else if (key === "job_overview_faq_then_resume") {
     template = composeJobOverviewThenResume(language, entities);
+  } else if (key === "office_location_faq_then_resume") {
+    template = composeOfficeLocationThenResume(language, entities);
   } else if (key === "insurance_faq_then_resume") {
     template = composeFaqThenResume(
       getInsuranceFaqAnswer(lang),
@@ -1221,8 +1281,15 @@ function renderCustomerReply(responsePlan) {
     .replace(/\{teamMemberPhrase\}/g, teamMemberPhrase)
     .replace(/\{TeamMemberPhrase\}/g, TeamMemberPhrase);
 
-  const fallback = pack.safe_failure_escalate || pack.default;
-  const sanitized = sanitizeCustomerCopy(rendered, fallback);
+  const fallback = applyTenantSafeTeamLabel(
+    pack.safe_failure_escalate || pack.default,
+    language,
+    entities
+  );
+  const sanitized = sanitizeCustomerCopy(
+    applyTenantSafeTeamLabel(rendered, language, entities),
+    fallback
+  );
   // Implements BR-102 — do not stack equivalent acknowledgements in one reply.
   const text =
     sanitized === fallback

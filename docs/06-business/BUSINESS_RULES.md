@@ -3596,7 +3596,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** Recruit AI v2 / qualification / location facts / tenant branding  
 **Depends on:** BR-083, BR-096, BR-100, BR-146, BR-173  
 **Related:** BR-217 location ZIP tolerance; Conversations Center Return-to-Atlas  
-**Status:** Implemented — not merged  
+**Status:** Implemented — merged  
 **Engine target:** `qualificationFacts.parseWorkAuthorizationAnswer`; `locationFacts`; `interpreter`; `factCertainty`; `responseRenderer`; `tenantBranding`  
 **Tests:** `backend/test/recruitAiV2PendingWorkAuthItinBr224.test.js`
 
@@ -3618,7 +3618,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** Recruit AI / appointments / communications / QR  
 **Depends on:** BR-018, BR-077, BR-146, BR-214, BR-224  
 **Related:** BR-226 tenant-scoped coverage geography  
-**Status:** Implemented — not merged  
+**Status:** Implemented — merged  
 **Engine target:** `officeAddressResolver.selectCustomerFacingOfficeAddress`; `teamVisionWorkflowCopy`; `responseRenderer`; `liveAuthoringBridge`; `recruitingWorkflowOrchestrator`; `manualInterviewReminderFallback`; `qrInterstitialBranding`  
 **Tests:** `backend/test/recruitAiV2TenantOfficeIdentityBr225.test.js`
 
@@ -3641,7 +3641,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** Recruit AI / qualification / meeting modality  
 **Depends on:** BR-019–022, BR-083, BR-085, BR-146, BR-224, BR-225  
 **Related:** BR-225 office identity stays separate from coverage geography  
-**Status:** Implemented — not merged  
+**Status:** Implemented — merged  
 **Engine target:** `recruitingCoverage`; `businessRulesEngine.evaluateCoverage`; `decisionEngine.resolveMeetingModalityForLocation`; `liveAuthoringBridge`; `orchestrator`  
 **Tests:** `backend/test/recruitAiV2TenantCoverageBr226.test.js`
 
@@ -3656,6 +3656,29 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 7. **Team Vision compatibility** — Team Vision Miami / Doral / Broward LOCAL behavior remains unchanged via seed fallback when no persisted list is present.
 8. **Provisioning** — New RVP tenants configure `recruitingConfig.coverage.localCities` in Settings → Recruiting. No code change. Do not save the Team Vision default city list unless that tenant actually recruits those cities.
 9. **Boundaries** — Does not change production data, ads, Team Legacy V2 grants, or Railway allowlists. Does not invent Team Legacy cities. Does not duplicate BR-225 office resolution.
+
+---
+
+## BR-229 — Preserve pending-state continuity across affirmative answers, FAQs, and location clarifications
+
+**Implements:** Recruit AI v2 must keep one first-turn greeting, accept stacked Spanish affirmatives as work authorization, answer job/office FAQs without dropping known facts, and never hand off or emit generic pending-data copy for those turns.  
+**Domain:** Recruit AI v2 / WhatsApp inbound / qualification + scheduling continuity  
+**Depends on:** BR-088, BR-097, BR-131, BR-147, BR-155, BR-164, BR-195, BR-196  
+**Related:** BR-224 (work-auth / tenant handoff branding); BR-225 / BR-226 (tenant office / coverage); BR-227 (AI Quality evidence — do not depend)  
+**Status:** Implemented — not merged  
+**Engine target:** `languageLibrary.isBareConversationalYes`; `qualificationFacts.parseWorkAuthorizationAnswer`; `conversationContinuity`; `interpreter`; `decisionEngine`; `responseRenderer`; `recruitingFirstTurnBurst`; `whatsappInboundPipeline`  
+**Tests:** `backend/test/recruitAiV2OffpathContinuityBr229.test.js`; `backend/test/recruitingFirstTurnBurstDedup.test.js`
+
+### Rules
+
+1. **One inbound → at most one automated first response** — Provider `wamid` idempotency stays fail-closed. Rapid first-turn fragments (campaign-code intake **or** CTWA / Meta ad referral) share one burst window. After the first automated greeting is in-flight or delivered, a late first-turn supplement must not send a second greeting.
+2. **Pending work-auth affirmatives** — While `lastQuestionAsked = ask_authorization`, unambiguous yes forms authorize: `si`, `sí`, `si claro`, `sí claro`, `claro`, `claro que si`, `si tengo`, `tengo permiso`. Do not let generic FAQ or location parsing outrank that pending yes. Pending-auth negatives from BR-224 (`No tengo`, `Solo ITIN`, `te dije que no`) remain higher priority than these affirmatives. `si tengo visa` must not auto-authorize.
+3. **Job FAQ mid-flow** — Phrases such as `Para que sería el trabajo?` / `What is the job?` are `JOB_OPPORTUNITY_QUESTION`. Answer truthfully, preserve known city / authorization / modality, and resume the pending question exactly once. Never emit `clarify_once` (“dato que te acabo de pedir”) for a recognized FAQ.
+4. **Office / nearby preference** — Typo-tolerant office questions and “busco algo cerca de …” (including Hallandale misspellings) are location preference / office FAQ, not a home-city overwrite and not a handoff. Keep an already confirmed city unless the prospect explicitly corrects it.
+5. **Generic pending-data fallback** — `clarify_once` is only for truly nonresponsive or unknown input. Valid pending answers, FAQs, objections, corrections, location preference, modality, scheduling, and clarification requests must take their dedicated path.
+6. **Tenant identity** — Handoff and office copy may say Team Vision only for the Team Vision seed tenant. Other tenants must not leak Team Vision branding or the Doral office address. Canonical branding is BR-224 `tenantBranding` / `organizationName`, not a string-strip workaround.
+7. **No contact-specific or tenant-only behavior hacks** — Shared Recruit V2 only. Do not enable semantic APPLY. AI Quality case emission for `DUPLICATE_GREETING` / `PENDING_ANSWER_REJECTED` / `FAQ_RESUME_FAILURE` / `PREMATURE_HANDOFF` is a follow-up (reason codes exist; BR-227 is not required).
+
 
 ---
 

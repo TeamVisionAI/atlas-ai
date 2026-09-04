@@ -3,6 +3,8 @@
  * Every non-terminal reply must ask/confirm/explain the next step — no bare "Continuemos".
  */
 
+const { canonicalizeCityName } = require("./locationFacts");
+
 function normalizeText(text) {
   return String(text || "")
     .trim()
@@ -147,6 +149,11 @@ function looksLikeJobOverviewQuestion(text) {
     /\bme (puedes|puede|podrias) explicar de que se trata\b/.test(t) ||
     /\bde que es la oportunidad\b/.test(t) ||
     /\bque es el (trabajo|empleo|rol)\b/.test(t) ||
+    /\bpara que (seria|es|seria el|es el) (el )?(trabajo|empleo|rol)\b/.test(t) ||
+    /\bpara que seria el (trabajo|empleo|rol)\b/.test(t) ||
+    /\bwhat would the (job|role|work|position) be\b/.test(t) ||
+    /\bwhat is the (job|role) for\b/.test(t) ||
+    /\bwhat'?s the (job|role|work)\b/.test(t) ||
     /\bde que se trata\b/.test(t) ||
     /\bde que trata\b/.test(t) ||
     /\bde q(ue)? (se )?trata\b/.test(t) ||
@@ -259,11 +266,102 @@ function looksLikeJobOpportunityQuestion(text) {
     /\bwhat kind of job\b/.test(t) ||
     /\bis this a business opportunity\b/.test(t) ||
     /\b(que es esto|what is the (job|role|position|opportunity|work))\b/.test(t) ||
+    /\bpara que (seria|es) (el )?(trabajo|empleo|rol)\b/.test(t) ||
+    /\bwhat would the (job|role|work|position) be\b/.test(t) ||
     /\bwhere (would|do|will) i work\b/.test(t) ||
     /\bque es el (trabajo|empleo)\b/.test(t) ||
     /\bdonde (trabajaria|trabajo|trabajare|seria el trabajo)\b/.test(t) ||
     /\btell me more\b/.test(t)
   );
+}
+
+/**
+ * BR-229 — office / "where are you located" questions, including common typos.
+ * Must not be treated as a home-city correction or a handoff.
+ */
+function looksLikeOfficeLocationQuestion(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return false;
+  }
+  return (
+    /\bdonde (estan|esta|esran|quedan|queda|quedaria) (ubicad[oa]s?|la oficina|las oficinas|ustedes)\b/.test(
+      t
+    ) ||
+    /\bdonde (estan|esta|esran) ubicad/.test(t) ||
+    /\b(donde|en donde) (queda|quedan|estan) (la )?oficina/.test(t) ||
+    /\bubicacion de (la |las )?oficinas?\b/.test(t) ||
+    /\bwhere (are you|is (the )?(office|company)|are (the )?offices)( located)?\b/.test(
+      t
+    ) ||
+    /\bwhere (is|are) (you|the office|your office|your offices)\b/.test(t) ||
+    /\boffice location\b/.test(t)
+  );
+}
+
+/**
+ * BR-229 — nearby / proximity preference ("busco algo cerca de Hallandale").
+ */
+function looksLikeNearbyLocationPreference(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return false;
+  }
+  return (
+    /\b(busco|busca|husco|quiero|necesito).{0,48}\b(cerca|serca|cercano)\b/.test(
+      t
+    ) ||
+    /\b(cerca|serca) (a|de|al)\b/.test(t) ||
+    (/\bnear(by)?\b/.test(t) &&
+      /\b(looking|want|need|office|something|close)\b/.test(t))
+  );
+}
+
+function extractNearbyCityPreference(text) {
+  const t = normalizeText(text);
+  if (!t) {
+    return null;
+  }
+  const aliasHit = t.match(
+    /\b(halandey|hallandey|halandale|hallandale(?: beach)?)\b/
+  );
+  if (aliasHit) {
+    return canonicalizeCityName(aliasHit[1]) || "Hallandale";
+  }
+  const nearHit = t.match(
+    /\b(?:cerca|serca|near(?:by)?)\s+(?:a|de|al|to)?\s+([a-z][a-z ]{2,30})$/
+  );
+  if (nearHit) {
+    return canonicalizeCityName(nearHit[1].trim()) || null;
+  }
+  return null;
+}
+
+/**
+ * Generic "share the datum I just asked" fallback is only for nonresponsive input.
+ */
+function looksLikeClarifiableNonresponsiveInput(text) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return true;
+  }
+  const t = normalizeText(raw);
+  if (!t || /^(hmm+|um+|uh+|eh+|ok|okay|vale)$/.test(t)) {
+    return true;
+  }
+  if (looksLikeJobOpportunityQuestion(raw) || looksLikeJobOverviewQuestion(raw)) {
+    return false;
+  }
+  if (looksLikeOfficeLocationQuestion(raw) || looksLikeNearbyLocationPreference(raw)) {
+    return false;
+  }
+  if (looksLikeSpanishInfoRequest(raw) || looksLikeEnglishInfoRequest(raw)) {
+    return false;
+  }
+  if (looksLikeConversationClarificationRequest(raw)) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -507,6 +605,10 @@ module.exports = {
   looksLikeCompanyIdentityQuestion,
   looksLikeJobOverviewQuestion,
   looksLikeJobOpportunityQuestion,
+  looksLikeOfficeLocationQuestion,
+  looksLikeNearbyLocationPreference,
+  extractNearbyCityPreference,
+  looksLikeClarifiableNonresponsiveInput,
   looksLikeConversationClarificationRequest,
   hasConcretePriorAtlasQuestion,
   lastQuestionImpliesDate,
