@@ -200,6 +200,7 @@ const COPY = Object.freeze({
     // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
     offer_available_slots: null,
     offer_nearest_alternatives: null,
+    selected_slot_no_longer_available: null,
     acknowledge_no_qualifying_availability:
       "I don't have availability after {earliestTime} that day. What other day or time window works for you?",
     clarify_am_pm: "Do you mean {ambiguousHour} in the morning or {ambiguousHour} in the afternoon/evening?",
@@ -366,6 +367,7 @@ const COPY = Object.freeze({
     // Implements BR-107 — real Sprint 22 slots only (renderer fills from offeredSlots).
     offer_available_slots: null,
     offer_nearest_alternatives: null,
+    selected_slot_no_longer_available: null,
     acknowledge_no_qualifying_availability:
       "No tengo disponibilidad después de las {earliestTime} ese día. ¿Qué otro día o horario te funciona?",
     clarify_am_pm:
@@ -1121,6 +1123,34 @@ function renderCustomerReply(responsePlan) {
         language === LANGUAGES.SPANISH
           ? `${constraintPrefix || "Tengo disponible "}${offered[0] ? phrase : `a las ${phrase}`}. ¿Te funciona?`
           : `${constraintPrefix || "I have availability "}${offered[0] ? phrase : `at ${phrase}`}. Does that work for you?`;
+    } else {
+      template = pack.acknowledge_no_qualifying_availability;
+    }
+  }
+
+  if (key === "selected_slot_no_longer_available") {
+    const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
+    const dayOptions = {
+      now: entities.now || null,
+      timezone: entities.timezone || offered[0]?.timezone || null
+    };
+    const optionPhrases = offered.map((slot) =>
+      formatOfferedSlotPhrase(slot, language, dayOptions)
+    );
+    if (optionPhrases.length >= 2) {
+      const joined =
+        language === LANGUAGES.SPANISH
+          ? optionPhrases.join(" y ")
+          : optionPhrases.join(" and ");
+      template =
+        language === LANGUAGES.SPANISH
+          ? `Ese horario ya no está disponible en este momento. Tengo disponibles ${joined}. ¿Cuál de estas opciones prefieres?`
+          : `That time is no longer available. I have ${joined} available. Which of these do you prefer?`;
+    } else if (optionPhrases.length === 1) {
+      template =
+        language === LANGUAGES.SPANISH
+          ? `Ese horario ya no está disponible en este momento. Tengo disponible ${optionPhrases[0]}. ¿Te funciona?`
+          : `That time is no longer available. I have ${optionPhrases[0]} available. Does that work for you?`;
     } else {
       template = pack.acknowledge_no_qualifying_availability;
     }

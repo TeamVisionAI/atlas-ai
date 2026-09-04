@@ -397,9 +397,10 @@ function applyExecutionOutcomeToReply({
   }
 
   const failedType = execution.failed?.[0]?.type || execution.performed?.[0]?.type;
-  const staleUnavailable = /SLOT_STALE|unavailable|stale/i.test(
+  const staleUnavailable = /SLOT_STALE|unavailable|stale|SELECTED_SLOT_NO_LONGER/i.test(
     String(execution.failed?.[0]?.reason || execution.reason || "")
   );
+  const staleReplacements = execution.failed?.[0]?.replacements || execution.replacements || [];
   const iulCreate =
     structuredDecision?.decision?.nextAction === NEXT_ACTIONS.IUL_CREATE_REVIEW_APPOINTMENT ||
     responsePlan?.templateKey === "iul_confirm_review_deferred" ||
@@ -408,12 +409,17 @@ function applyExecutionOutcomeToReply({
     failedType === "reschedule_appointment" ||
     structuredDecision?.decision?.nextAction === "reschedule_appointment"
       ? "appointment_reschedule_failed"
-      : staleUnavailable
-        ? "offer_alternatives_no_handoff"
+      : staleUnavailable && Array.isArray(staleReplacements) && staleReplacements.length
+        ? "selected_slot_no_longer_available"
+        : staleUnavailable
+          ? "offer_alternatives_no_handoff"
         : iulCreate
           ? "iul_review_create_failed"
           : "appointment_create_failed";
   entities.zoomJoinUrl = null;
+  if (failKey === "selected_slot_no_longer_available") {
+    entities.offeredSlots = staleReplacements;
+  }
   const plan = {
     ...responsePlan,
     templateKey: failKey,
@@ -438,6 +444,36 @@ function applyExecutionOutcomeToReply({
 function applyExecutionToContext(nextContext, execution) {
   if (!execution?.attempted) {
     return nextContext;
+  }
+  const staleReplacements = execution.replacements || execution.failed?.[0]?.replacements;
+  if (
+    !execution.success &&
+    /SLOT_STALE|SELECTED_SLOT_NO_LONGER/i.test(String(execution.reason || "")) &&
+    Array.isArray(staleReplacements)
+  ) {
+    return {
+      ...nextContext,
+      currentStage: STAGES.SCHEDULING,
+      appointment: {
+        ...nextContext.appointment,
+        status: APPOINTMENT_STATUS.PROPOSED,
+        appointmentId: null,
+        proposedDate: null,
+        proposedTime: null,
+        confirmedDate: null,
+        confirmedTime: null,
+        previouslyOfferedSlots: staleReplacements
+      },
+      conversation: {
+        ...nextContext.conversation,
+        lastQuestionAsked:
+          staleReplacements.length > 0 ? "offer_time_choices" : "ask_day_part",
+        lastOfferMade:
+          staleReplacements.length > 0
+            ? "selected_slot_no_longer_available"
+            : "acknowledge_no_qualifying_availability"
+      }
+    };
   }
   if (!execution.success || !execution.appointmentId) {
     return {
@@ -678,13 +714,42 @@ async function processRecruitAiV2Turn({
 
   // Implements BR-107 — read-only availability injection (never writes).
   let resolvedAvailability = availability;
+  const availabilityOptions = {
+    ...options,
+    getSlots: options.getSlots || options.dependencies?.getSlots || null
+  };
   if (!options.forceSafeFailure && resolvedAvailability == null) {
     resolvedAvailability = await resolveAvailabilityForTurn({
       context: loaded,
       interpretation,
       availability: null,
-      options
+      options: availabilityOptions
     });
+  }
+
+  if (
+    !options.forceSafeFailure &&
+    (options.allowExecution === true ||
+      typeof availabilityOptions.getSlots === "function")
+  ) {
+    try {
+      const {
+        isRecruitingConfirmSlotTurn,
+        recheckSelectedSlotAvailability
+      } = require("./recruitingConfirmationBookingSafety");
+      if (isRecruitingConfirmSlotTurn({ context: loaded, interpretation })) {
+        const confirmationRecheck = await recheckSelectedSlotAvailability({
+          context: loaded,
+          options: availabilityOptions
+        });
+        resolvedAvailability = {
+          ...(resolvedAvailability || {}),
+          confirmationRecheck
+        };
+      }
+    } catch {
+      // Recheck must never block a confirm turn; executor still guards stale slots.
+    }
   }
 
   let structuredDecision;

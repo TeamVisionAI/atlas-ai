@@ -76,6 +76,10 @@ const {
   canonicalizeCityName,
   isStateNameNotCity
 } = require("./locationFacts");
+const {
+  selectedSlotFromContext,
+  pickReplacementSlots
+} = require("./recruitingConfirmationBookingSafety");
 
 function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
   if (!Array.isArray(offeredSlots) || offeredSlots.length === 0) {
@@ -377,6 +381,62 @@ function applyRestateNarrowedOfferedSlots(
  * BR-119 — same-day no-op: date already fixed on the offered set; ask which time.
  * Do not re-render the full "Tengo disponible el lunes…" availability sentence.
  */
+function applySelectedSlotNoLongerAvailable(
+  structured,
+  replacements,
+  { context = null, interpretation = null } = {}
+) {
+  const offered = Array.isArray(replacements) ? replacements : [];
+  structured.decision.nextAction = NEXT_ACTIONS.OFFER_AVAILABLE_SLOTS;
+  structured.decision.requiresExplicitConfirmation = false;
+  structured.decision.mayCreateAppointment = false;
+  structured.decision.mayRescheduleAppointment = false;
+  structured.decision.shouldEscalate = false;
+  structured.decision.executionAuthorized = false;
+  structured.customerReplyPlan.acknowledgeRequest = true;
+  structured.customerReplyPlan.templateKey =
+    offered.length > 0
+      ? "selected_slot_no_longer_available"
+      : "acknowledge_no_qualifying_availability";
+  structured.customerReplyPlan.entities = {
+    ...structured.customerReplyPlan.entities,
+    offeredSlots: offered,
+    requestedDate: slotDate(offered[0]) || context?.appointment?.proposedDate || null,
+    requestedTime: context?.appointment?.proposedTime || null,
+    slotA: slotTime(offered[0]) || null,
+    slotB: slotTime(offered[1]) || null,
+    timezone: offered[0]?.timezone || context?.timezone || null
+  };
+  structured.reasonCodes.push(REASON_CODES.SELECTED_SLOT_NO_LONGER_AVAILABLE);
+  structured.reasonCodes.push(REASON_CODES.SLOT_UNAVAILABLE_OFFER_ALTERNATIVES);
+  structured.reasonCodes.push(REASON_CODES.SCHEDULING_HANDOFF_GUARD);
+  structured.contextPatch = {
+    appointment: {
+      status: APPOINTMENT_STATUS.PROPOSED,
+      appointmentId: null,
+      proposedDate: null,
+      proposedTime: null,
+      confirmedDate: null,
+      confirmedTime: null,
+      previouslyOfferedSlots: offered
+    },
+    conversation: {
+      lastQuestionAsked:
+        offered.length > 0 ? "offer_time_choices" : "ask_day_part",
+      lastProspectIntent: interpretation?.intent || INTENTS.SCHEDULE_CONFIRM,
+      lastOfferMade:
+        offered.length > 0
+          ? "selected_slot_no_longer_available"
+          : "acknowledge_no_qualifying_availability",
+      pendingClarification: null,
+      clarificationCount: 0
+    },
+    currentStage: STAGES.SCHEDULING,
+    attention: { needsHumanAttention: false, reason: null }
+  };
+  return structured;
+}
+
 function applyAskWhichOfferedTime(
   structured,
   matches,
@@ -3893,6 +3953,31 @@ function decideConversationTurnCore({
       singleOffer?.time ||
       singleOffer?.timeKey ||
       null;
+
+    const recheck = availability?.confirmationRecheck || null;
+    const lastQ = String(context.conversation?.lastQuestionAsked || "");
+    const selected = selectedSlotFromContext(context);
+    if (
+      lastQ === "confirm_slot" &&
+      selected &&
+      recheck?.checked === true &&
+      recheck.stillAvailable !== true
+    ) {
+      const replacements =
+        Array.isArray(recheck.replacements) && recheck.replacements.length
+          ? recheck.replacements
+          : pickReplacementSlots(
+              availability?.readResult?.slots ||
+                availability?.offeredSlots ||
+                availability?.nearestAlternatives ||
+                [],
+              selected
+            );
+      return applySelectedSlotNoLongerAvailable(structured, replacements, {
+        context,
+        interpretation
+      });
+    }
 
     const rescheduleExisting = isExistingAppointmentReschedule(context);
     structured.decision.nextAction = rescheduleExisting
