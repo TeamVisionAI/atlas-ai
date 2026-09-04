@@ -22,9 +22,8 @@ const { assertProductionPlatformConfig } = require("./core/platformProductionGua
 assertProductionPlatformConfig();
 
 const express = require("express");
-const cors = require("cors");
 const {
-  buildCorsOptions,
+  createAtlasCors,
   createDisallowedOriginRejector
 } = require("./config/corsOptions");
 
@@ -140,7 +139,7 @@ const PORT = process.env.PORT || 3000;
 
 // General middleware — production allowlist includes teamvisionfinancial.com (+ www, localhost
 // dev) and the normalized ATLAS_PUBLIC_URL origin (required for public QR /go form POSTs).
-app.use(cors(buildCorsOptions()));
+app.use(createAtlasCors());
 app.use(createDisallowedOriginRejector());
 app.use(safeRequestLogger);
 

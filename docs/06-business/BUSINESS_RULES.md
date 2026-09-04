@@ -3744,7 +3744,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 ### Rules
 
 1. **Attribution only** — Persist organization, username, command, command text, optional gift name, campaign, funnel, source `TIKTOK_LIVE`, platform `tiktok`. Do not create a core prospect, recruiting prospect, IUL lead, conversation, recruiter assignment, or WhatsApp outbound.
-2. **Secret required** — `TIKFINITY_WEBHOOK_SECRET` compared with query `secret` (or `x-tikfinity-secret`) using a constant-time-safe compare. Missing or wrong secret is `401`. Do not log the secret.
+2. **Secret required** — This is a public machine-to-machine webhook. It is not Atlas session, cookie, CSRF, or same-origin auth. `TIKFINITY_WEBHOOK_SECRET` compared with query `secret` (or `x-tikfinity-secret`) using a constant-time-safe compare. Missing or wrong secret is `401`. Do not log the secret. Origin/Referer must not produce a global `403` for the exact path `/api/integrations/tikfinity/live-event`.
 3. **Tenant explicit** — `organizationId` is required and must exist. Do not infer tenant from username. Fail closed on missing, malformed, or unknown org.
 4. **Command whitelist** — Normalize `/iul`, `?IUL`, `IUL` → `IUL` and `/trabajo` → `TRABAJO`. Unknown commands return `400`.
 5. **Dedupe** — Same org + username + command + command text inside a short window must not create unlimited rows. Safe duplicate response may return `recorded: false`.
