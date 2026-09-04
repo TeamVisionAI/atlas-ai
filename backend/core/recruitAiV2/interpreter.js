@@ -1095,7 +1095,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     if (authAnswer === true || authAnswer === false) {
       entities.workAuthorization = authAnswer;
     }
-  } else if (isGreeting(text)) {
+  } else if (
+    isGreeting(text) &&
+    !(locationCtx && parseLocationAnswer(text)?.city)
+  ) {
     intent = INTENTS.GREETING;
     confidence = 0.95;
   } else if (looksLikeExplicitScheduleRequest(text)) {

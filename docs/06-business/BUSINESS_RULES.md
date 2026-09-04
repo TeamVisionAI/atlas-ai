@@ -4473,18 +4473,18 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Related:** BR-080 (attention on repeated unresolved ambiguity), BR-018–021 (workflow copy), first production feedback case (Hola / Miami / La or)  
 **Status:** Implemented in code (flags unchanged: capture/shadow rates not modified by this rule; v2 execution remains off)  
 **Engine target:** `backend/core/recruitAiV2/*` (interpreter, decisionEngine, languagePolicy, locationFacts, contextTurnUpdate, responseRenderer, advisoryTurnRunner); narrow live CE: `informationExtractor.js`, `qualificationCaptureState.js`, `semanticConversationEngine.js`, `teamVisionWorkflowCopy.js`  
-**Tests:** `backend/test/recruitAiV2FirstProductionFeedback.test.js`  
+**Tests:** `backend/test/recruitAiV2FirstProductionFeedback.test.js`; `backend/test/recruitAiV2PendingLocationConversationalParse.test.js`  
 **Fixture:** `backend/test/fixtures/recruitAiV2/first-production-feedback.json`  
 **Docs:** `docs/03-engineering/recruit-ai-v2/09_FIRST_PRODUCTION_FEEDBACK.md`
 
 ### Rules
 
 1. **Greeting intent** — Deterministic greetings (`hi`/`hello`/`hola`/…) are `greeting`. They must not trigger low-confidence human escalation; continue canonical qualification (ask city/state).
-2. **Partial location** — City-only answers (e.g. `Miami`) are `provide_location` with `completeness=partial`. Do **not** invent a confirmed state. A geographically likely state may be **proposed** for confirmation only.
+2. **Partial location** — City-only answers (e.g. `Miami`, `Orlando`, `estoy en Orlando`) are `provide_location`. Preserve the city even when state is omitted. Do **not** invent a confirmed state unless an approved high-confidence city→state rule already resolves it. A geographically likely state may be **proposed** for confirmation only. Do **not** emit generic `clarify_once` merely because state is missing.
 3. **Fact certainty** — Distinguish `confirmed` / `proposed` / `partial` / `unknown`. Inferred location is never confirmed prospect data until confirmation or an approved deterministic complete parse (`Miami, FL` / `Florida` after city).
 4. **Language adaptation** — Preferred language is sticky but not immutable when the prior value was only default/inferred. Clear active-conversation Spanish evidence (e.g. greeting `Hola`) may adopt Spanish. Explicit preferences stay sticky. No bilingual replies. Do not flip on a single ambiguous token.
 5. **Fragments are not names** — Short ambiguous scraps (`La or`, `afte`, `maña`) must not classify as `provide_name`. Prefer `ambiguous_fragment` / `incomplete_day_part` constrained by last question asked.
-6. **Last-question context** — Ambiguous replies are interpreted relative to `lastQuestionAsked` / last outbound (e.g. day-part question → incomplete day-part, not name).
+6. **Last-question context** — Ambiguous replies are interpreted relative to `lastQuestionAsked` / last outbound (e.g. day-part question → incomplete day-part, not name). While location is pending (`ask_location` / `greeting_ask_location` / `ask_city` / `ask_state` / `confirm_location`), conversational living preambles (`estoy en`, `vivo en`, `soy de`, `me encuentro en`, `estoy ubicado en`, and English equivalents) plus leading greeting/thanks (`hola`, `gracias`) extract the city/state candidate. Greeting-only (`Hola`) still resumes the location ask. Genuine non-location replies may still clarify.
 7. **Day-part clarification** — Recognize morning/afternoon (EN/ES). Incomplete replies clarify once with non-identical copy; repeated misunderstanding may escalate per BR-080 policy.
 8. **Escalation threshold** — Ordinary recoverable ambiguity (greeting, city-only, typo, partial day-part) clarifies first. Escalate after repeated unresolved ambiguity, unsupported requests, safety boundaries, or genuine low confidence after reasonable clarification.
 9. **Live CE safety (temporary authority)** — Live CE must not persist city→state inventions without confirmation and must not advance city-only partial location to `DAY_PART`. Day-part fragments clarify without identical infinite loops.
