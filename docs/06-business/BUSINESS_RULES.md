@@ -4393,19 +4393,19 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ## BR-085 — Recruit AI Date Resolution, Cancellation, and Meeting-Mode Confirmation
 
-**Implements:** Weekday/date-only proposals (never midnight); preserve prior active time with date changes; relative date exclusions; organization-local calendar resolution (BR-079); cancel vs withdraw vs STOP; OUTSIDE/remote explicit in-person requires Doral travel confirmation before office modality  
+**Implements:** Weekday/date-only proposals (never midnight); same-turn weekday/date + day-part composition; preserve prior active time with date changes; relative date exclusions; organization-local calendar resolution (BR-079); cancel vs withdraw vs STOP; OUTSIDE/remote explicit in-person requires Doral travel confirmation before office modality  
 **Domain:** Recruit AI / Conversation / Scheduling dialogue  
 **Depends on:** BR-081, BR-082, BR-083, BR-084, BR-079, BR-018–021  
 **Related:** BR-049 (Conversation Engine), BR-080 (read-only; no mutation from v2)  
 **Status:** Implemented in code (flags unchanged; v2 execution remains off)  
 **Engine target:** `backend/core/recruitAiV2/dateResolution.js`, interpreter, decisionEngine, contextTurnUpdate, responseRenderer, sideEffectAuthorizer, `scheduleLanguageParser.js`  
-**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix5.test.js`  
+**Tests:** `backend/test/recruitAiV2PlaygroundFeedbackFix5.test.js`; `backend/test/recruitAiV2CompoundWeekdayDayPart.test.js`  
 **Simulator:** `orlando-scheduling-date-change-cancellation`  
 **Docs:** `docs/03-engineering/recruit-ai-v2/15_PLAYGROUND_FEEDBACK_DATE_CANCEL_MEETING_MODE.md`
 
 ### Rules
 
-1. **Date-only proposals** — Weekday / relative-day phrases without a clock time set `dateCandidate` only. Never invent `00:00` / “12:00 AM” unless the prospect explicitly says midnight / 12 AM / medianoche.
+1. **Date-only proposals** — Weekday / relative-day phrases without a clock time set `dateCandidate` only. Never invent `00:00` / “12:00 AM” unless the prospect explicitly says midnight / 12 AM / medianoche. If the same message also names a day-part (`en la tarde`, `por la mañana`, `afternoon`), capture both `requestedDate` / `resolvedDate` and `dayPart` on that turn and overwrite a stale prior day-part. Do not invent a day-part when none appears. An explicit clock time still wins (`Miércoles a las 3:30` → date + exact time, no invented conflicting day-part). Date-only and day-part-only phrases remain independent.
 2. **Prior time preservation** — When an active candidate time exists (e.g. 7 PM) and the prospect proposes a new day (“el lunes”), keep the time and confirm “¿El lunes a las 7:00 PM te funciona?”
 3. **Date replacement** — One active `proposedDate`; Monday → Tuesday replaces the date and keeps coherent time; prior dates are history only.
 4. **Relative exclusions** — “No puedo hoy ni mañana, ¿puede ser el lunes?” captures unavailable today/tomorrow **and** Monday as the candidate.

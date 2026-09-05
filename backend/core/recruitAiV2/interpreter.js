@@ -1366,6 +1366,12 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
     entities.resolvedDate = resolvedDate;
     entities.dateExclusions = resolvedExclusions;
     entities.priorProposedTime = context?.appointment?.proposedTime || null;
+    // Implements BR-085 — weekday/date classification must still compose a
+    // same-turn day-part ("Miércoles en la tarde", "Friday afternoon").
+    // Exact clock time is not this branch (hasTimeEntity → counteroffer).
+    if (dayPartParse?.complete && dayPartParse.dayPart && !hasTimeEntity) {
+      entities.dayPart = dayPartParse.dayPart;
+    }
     // Implements BR-119 — "más tarde" / later means leave offered set and re-read.
     entities.requestsLaterAlternatives = looksLikeRequestForLaterAlternatives(text);
   } else if (
