@@ -200,11 +200,3 @@ export async function resetCanaryProspect(payload) {
     body: JSON.stringify(payload)
   });
 }
-
-export async function resetCanaryProspect(payload) {
-  return apiFetch("/api/platform/canary-reset", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-}
