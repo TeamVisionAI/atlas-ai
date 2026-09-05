@@ -306,7 +306,7 @@ function parseIulReviewDayPart(text) {
   if (/\bnoche\b/.test(t) || /\bevening\b/.test(t) || /\bnight\b/.test(t)) {
     return "evening";
   }
-  if (/\btarde\b/.test(t) || /\bafternoon\b/.test(t)) {
+  if (/\btardes?\b/.test(t) || /\bafternoon\b/.test(t)) {
     return "afternoon";
   }
   if (
