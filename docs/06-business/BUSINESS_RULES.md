@@ -3868,6 +3868,28 @@ Coverage is not a `reason`. Use `coverageResult`: `COVERAGE_LOCAL`, `COVERAGE_OU
 6. **No fuzzy matching** — Do not treat arbitrary text that merely contains `no` as unknown.
 7. **Boundaries** — Do not change conversation locks, HUMAN ownership, location parsing, coverage, booking, or campaign eligibility.
 
+---
+
+## BR-239 — Natural Acceptance of Current Offered Slots
+
+**Implements:** When Recruit AI v2 has already offered concrete durable slots, a natural acceptance or a clock that uniquely matches those slots selects that slot. Atlas must not invent a time and must not bind a stale prior offer.  
+**Domain:** Recruit AI / scheduling conversation continuity  
+**Depends on:** BR-081, BR-103, BR-111, BR-115, BR-119, BR-190  
+**Related:** BR-101 (day-part clock inheritance), BR-116 (outside-set counteroffer)  
+**Status:** Implemented  
+**Engine target:** `conversationContext.resolveUniqueOfferedSlotSelection`; `interpreter.js`; `decisionEngine.js`  
+**Tests:** `backend/test/recruitAiV2NaturalOfferedSlotAcceptanceBr239.test.js`
+
+### Rules
+
+1. **Current durable offered slots only** — Resolve against `appointment.previouslyOfferedSlots`. Never invent a slot. A newer offer replaces the prior set; do not bind a clock from a stale offer.
+2. **Exactly one offered slot + acceptance** — Replies such as `me parece bien`, `está bien`, `perfecto`, `dale`, `ok`, `okay`, `me sirve`, `esa está bien`, `esa hora está bien`, `sí`, `si` select that single slot via the existing confirmation path (`confirm_selected_slot` / `confirm_slot`). Do not re-ask day-part or preferred time.
+3. **Multiple offered slots + acceptance only** — Do not guess. Ask which of the currently offered times they prefer.
+4. **Acceptance-wrapped clock** — Phrases such as `11:45 está bien`, `ok 4:00`, `a las 4`, `4`, `4 pm`, `me sirve 11:45` extract a clock and match it against the current offered set. If exactly one offered candidate matches, select it. Use offered-slot context to resolve AM/PM when safe (`ok 4` against `12:30 PM` + `4:00 PM` → `16:00`, not `04:00`).
+5. **Time not offered** — A stated clock that is not in the current offered set does not silently book. Keep existing unavailable / counteroffer / clarification behavior.
+6. **Confirmation unchanged** — `confirm_slot` / BR-190 `Si` keeps existing confirmation semantics. This rule does not authorize a second appointment or calendar create.
+7. **Boundaries** — Do not change availability generation, tenant business hours, Google Calendar availability, BR-237 concurrency, HUMAN ownership, city parsing, IUL carrier normalization, or campaign eligibility.
+
 
 ---
 
