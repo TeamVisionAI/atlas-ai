@@ -2123,7 +2123,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 **Related:** BR-039 (confirm-time slot recheck), BR-049 (conversation still delegates to the same slot engine)  
 **Status:** Implemented (feature-flagged)  
 **Engine target:** `appointmentSchedulingEngine.js`, `availabilityTypes.js`, `icsBusyWindowCalculator.js`, `icloudCalDavClient.js`, `icloudCalendarIntegrationService.js`  
-**Tests:** `backend/test/icloudAvailabilityBr161.test.js`
+**Tests:** `backend/test/icloudAvailabilityBr161.test.js`; `backend/test/icloudOverlayDegradeGoogleAvailability.test.js`
 
 ### Rules
 
@@ -2134,7 +2134,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 5. **Ownership** — Per-user only (`organization_id` + `user_id` + `provider=icloud_calendar`). Never tenant-wide. Hierarchy does not grant credential management. Support Mode may see connection status, never the app-specific password.
 6. **Credentials** — Apple Account email + app-specific password. Encrypt the password with existing token encryption. Never store the password in `config`. Never log passwords, Basic Auth, raw ICS, titles, attendees, or descriptions.
 7. **Busy math** — Do not depend on Apple free/busy. Discover CalDAV calendars, `REPORT calendar-query` a time range, and compute busy from ICS (timed, RRULE, EXDATE, RECURRENCE-ID, cancelled, TRANSPARENT, all-day, TZID/DST). Expand only inside the requested window and cap pathological recurrence.
-8. **Fail closed** — If iCloud is not connected, ignore it. If connected and readable, merge busy. If connected and 401/403, offer no slots and require reconnect. If connected and transiently unavailable, offer no slots for that request. Never assume the user is free because Apple failed.
+8. **Optional overlay degrades** — If iCloud is not connected, ignore it. If connected and readable, merge busy. If connected and `ICLOUD_RECONNECT_REQUIRED` / 401/403 / transiently unavailable, log overlay unavailable, skip iCloud for that read, and continue with Atlas recurring availability plus the authoritative Google scheduling calendar. Do **not** collapse the read to zero slots, treat Google as disconnected, or switch the primary booking provider to iCloud. Never write to Apple Calendar. If the authoritative Google calendar itself fails (`GOOGLE_RECONNECT_REQUIRED` / unavailable), do not invent slots.
 9. **Feature flag** — Default off (`ATLAS_ICLOUD_CALENDAR_AVAILABILITY_ENABLED`). Optional org/user allowlists for canary.
 10. **Boundaries** — No WhatsApp, Recruit AI dialogue, IUL, billing, prospect-identity, or appointment-lifecycle changes.
 
@@ -2157,7 +2157,7 @@ Production outside-window messaging requires firm-approved Meta templates config
 3. **Explicit selection** — Showing Ana-only or Niovel-only availability must use that interviewer’s conflicts and calendars only.
 4. **Zoom owner** — Assigned `interviewer_user_id` is the Zoom authority. Snapshot that user’s personal Zoom URL on the appointment. Confirmations, 24h/1h/15m reminders, reschedule, and Join Zoom use the snapshot.
 5. **No identity leak** — Do not resolve Zoom from the logged-in admin, Support Mode actor, or another interviewer. Do not use tenant default Zoom when a personal interviewer is assigned. If the assigned interviewer has no personal Zoom, fail closed.
-6. **Boundaries** — Does not change daypart logic, BR-159, BR-161 fail-closed iCloud behavior, WhatsApp tenant isolation, billing, or appointment lifecycle states.
+6. **Boundaries** — Does not change daypart logic, BR-159, WhatsApp tenant isolation, billing, or appointment lifecycle states. BR-161 iCloud remains a read-only overlay that degrades when overlay auth fails.
 
 ---
 

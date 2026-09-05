@@ -127,6 +127,28 @@ function isOwnBusyWindow(range, excludedWindow) {
   );
 }
 
+function googleFailureCode(error) {
+  return String(error?.publicCode || error?.code || "").trim();
+}
+
+function isPrimaryGoogleCalendarFailure(error) {
+  const code = googleFailureCode(error);
+  return code === "GOOGLE_RECONNECT_REQUIRED" || code === "GOOGLE_UNAVAILABLE";
+}
+
+function logIcloudOverlaySkipped({ organizationId, userId, code }) {
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      component: "appointment_scheduling_engine",
+      stage: "icloud_overlay_skipped",
+      organizationId: organizationId || null,
+      userId: userId || null,
+      code: code || null
+    })
+  );
+}
+
 async function fetchGoogleBusyRanges(organizationId, timeMin, timeMax, timezone, userId = null) {
   // BR-147 / BR-161 — Google adapter wraps queryFreeBusy; behavior unchanged.
   return googleAvailabilityProvider.listBusyWindows({
@@ -279,6 +301,7 @@ async function getAvailableSlots({
 
   const slots = [];
   let conflictExplanation = null;
+  let icloudOverlaySkippedReason = null;
   const excludedId = excludeAppointmentId ? String(excludeAppointmentId) : null;
 
   const cursor = new Date(startDate);
@@ -333,7 +356,23 @@ async function getAvailableSlots({
         busyRanges.push(
           ...googleBusy.filter((range) => !isOwnBusyWindow(range, excludedWindow))
         );
-      } catch {
+      } catch (googleError) {
+        // Authoritative Google calendar auth/unavailable must not invent slots.
+        if (isPrimaryGoogleCalendarFailure(googleError)) {
+          return {
+            agentId,
+            organizationId,
+            purpose,
+            durationMinutes: duration,
+            timePreference,
+            timezone,
+            slots: [],
+            conflictExplanation:
+              "Google Calendar is unavailable. Slots are not offered until it can be read.",
+            availabilityBlockedReason:
+              googleFailureCode(googleError) || "GOOGLE_UNAVAILABLE"
+          };
+        }
         // Google overlay remains fail-open (unchanged).
       }
 
@@ -349,26 +388,22 @@ async function getAvailableSlots({
           ...(icloudBusy || []).filter((range) => !isOwnBusyWindow(range, excludedWindow))
         );
       } catch (icloudError) {
-        // Implements BR-161 — connected iCloud auth/unavailable fails closed.
+        // Implements BR-161 — optional iCloud overlay degrades; Google stays primary.
         if (
           isAvailabilityAuthError(icloudError) ||
           isAvailabilityUnavailableError(icloudError)
         ) {
-          return {
-            agentId,
+          const overlayCode =
+            icloudError.code || icloudError.publicCode || "ICLOUD_UNAVAILABLE";
+          logIcloudOverlaySkipped({
             organizationId,
-            purpose,
-            durationMinutes: duration,
-            timePreference,
-            timezone,
-            slots: [],
-            conflictExplanation: isAvailabilityAuthError(icloudError)
-              ? "Apple Calendar authorization expired. Reconnect Apple Calendar / iCloud to continue."
-              : "Apple Calendar is temporarily unavailable. Slots are not offered until it can be read.",
-            availabilityBlockedReason: icloudError.code || icloudError.publicCode || "ICLOUD_UNAVAILABLE"
-          };
+            userId: agentId,
+            code: overlayCode
+          });
+          icloudOverlaySkippedReason = overlayCode;
+        } else {
+          throw icloudError;
         }
-        throw icloudError;
       }
     }
 
@@ -461,7 +496,8 @@ async function getAvailableSlots({
     timePreference,
     timezone,
     slots,
-    conflictExplanation
+    conflictExplanation,
+    icloudOverlaySkippedReason
   };
 }
 
@@ -473,5 +509,6 @@ module.exports = {
   matchesTimePreference,
   buildBusyRanges,
   isSlotBlocked,
-  isOwnBusyWindow
+  isOwnBusyWindow,
+  isPrimaryGoogleCalendarFailure
 };
