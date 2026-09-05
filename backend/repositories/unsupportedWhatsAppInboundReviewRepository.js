@@ -1,5 +1,6 @@
 /**
- * BR-156 — Durable unsupported WhatsApp inbound review records.
+ * BR-156 / BR-234 — Durable unsupported WhatsApp inbound review records.
+ * prospect_id is nullable for contact-only 131060 reviews.
  */
 
 const { supabase } = require("../services/supabaseService");
@@ -59,7 +60,7 @@ function toInsertRow(input) {
   return {
     review_type: input.reviewType,
     organization_id: input.organizationId,
-    prospect_id: input.prospectId,
+    prospect_id: input.prospectId || null,
     owner_user_id: input.ownerUserId || null,
     assigned_owner_user_id: input.assignedOwnerUserId || input.ownerUserId || null,
     sender_phone_e164: input.senderPhoneE164,

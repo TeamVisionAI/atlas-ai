@@ -192,6 +192,10 @@ export const translations = {
     unsupportedWhatsAppLeadReviewTitle: "Posible lead de WhatsApp necesita revisión",
     unsupportedWhatsAppLeadReviewBody:
       "Meta no pudo entregar el contenido de este mensaje. Atlas no respondió automáticamente porque no pudo verificar su origen.",
+    unsupportedWhatsAppLeadReviewContactOnlyTitle:
+      "Lead de WhatsApp no pudo leerse y necesita seguimiento",
+    unsupportedWhatsAppLeadReviewContactOnlyBody:
+      "Meta no pudo leer este lead de anuncio de WhatsApp. Puede ser necesario un seguimiento manual.",
     unsupportedWhatsAppLeadReviewContact: "Contacto",
     unsupportedWhatsAppLeadReviewSender: "Teléfono",
     unsupportedWhatsAppLeadReviewReceived: "Recibido",
@@ -2786,6 +2790,10 @@ export const translations = {
     unsupportedWhatsAppLeadReviewTitle: "Possible WhatsApp lead needs review",
     unsupportedWhatsAppLeadReviewBody:
       "Meta could not deliver this message content. Atlas did not auto-reply because it could not verify the lead origin.",
+    unsupportedWhatsAppLeadReviewContactOnlyTitle:
+      "WhatsApp ad lead needs manual follow-up",
+    unsupportedWhatsAppLeadReviewContactOnlyBody:
+      "WhatsApp ad lead could not be read by Meta. Manual follow-up may be required.",
     unsupportedWhatsAppLeadReviewContact: "Contact",
     unsupportedWhatsAppLeadReviewSender: "Phone",
     unsupportedWhatsAppLeadReviewReceived: "Received",

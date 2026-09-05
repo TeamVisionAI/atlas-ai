@@ -32,6 +32,7 @@ export default function UnsupportedWhatsAppLeadReviewBanner({
   return (
     <div className="unsupported-wa-review-stack" data-testid="unsupported-wa-review-stack">
       {reviews.map((review) => {
+        const contactOnly = !review.prospectId;
         const prospectPath = buildProspectWorkspacePath(review.senderPhoneE164);
         const receivedLabel = formatReceivedAt(review.receivedAt, language);
         const destination =
@@ -43,13 +44,22 @@ export default function UnsupportedWhatsAppLeadReviewBanner({
             className="unsupported-wa-review-banner"
             role="alert"
             data-testid={`unsupported-wa-review-${review.id}`}
+            data-contact-only={contactOnly ? "true" : "false"}
           >
             <div className="unsupported-wa-review-banner__copy">
               <strong className="unsupported-wa-review-banner__title">
-                {translate("unsupportedWhatsAppLeadReviewTitle")}
+                {translate(
+                  contactOnly
+                    ? "unsupportedWhatsAppLeadReviewContactOnlyTitle"
+                    : "unsupportedWhatsAppLeadReviewTitle"
+                )}
               </strong>
               <p className="unsupported-wa-review-banner__body">
-                {translate("unsupportedWhatsAppLeadReviewBody")}
+                {translate(
+                  contactOnly
+                    ? "unsupportedWhatsAppLeadReviewContactOnlyBody"
+                    : "unsupportedWhatsAppLeadReviewBody"
+                )}
               </p>
               <ul className="unsupported-wa-review-banner__meta">
                 {review.prospectName ? (
@@ -74,20 +84,24 @@ export default function UnsupportedWhatsAppLeadReviewBanner({
             </div>
 
             <div className="unsupported-wa-review-banner__actions">
-              <Link
-                className="unsupported-wa-review-banner__button unsupported-wa-review-banner__button--primary"
-                to={prospectPath}
-              >
-                {translate("unsupportedWhatsAppLeadReviewOpenProspect")}
-              </Link>
-              <button
-                type="button"
-                className="unsupported-wa-review-banner__button"
-                disabled={busyReviewId === review.id}
-                onClick={() => onConfirm?.(review)}
-              >
-                {translate("unsupportedWhatsAppLeadReviewConfirmLead")}
-              </button>
+              {contactOnly ? null : (
+                <>
+                  <Link
+                    className="unsupported-wa-review-banner__button unsupported-wa-review-banner__button--primary"
+                    to={prospectPath}
+                  >
+                    {translate("unsupportedWhatsAppLeadReviewOpenProspect")}
+                  </Link>
+                  <button
+                    type="button"
+                    className="unsupported-wa-review-banner__button"
+                    disabled={busyReviewId === review.id}
+                    onClick={() => onConfirm?.(review)}
+                  >
+                    {translate("unsupportedWhatsAppLeadReviewConfirmLead")}
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className="unsupported-wa-review-banner__button unsupported-wa-review-banner__button--ghost"
