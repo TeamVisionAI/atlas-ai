@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116 / BR-119 / BR-164.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116 / BR-119 / BR-164 / BR-231.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -862,10 +862,17 @@ function tryApplyAvailabilityOffer({
       preferredDayPart:
         interpretation?.entities?.dayPart ||
         context.knownFacts?.preferredDayPart ||
-        null
+        null,
+      dayFirstEvidenceSlots: [
+        ...alternatives,
+        ...(availability.readResult?.offeredSlots || []),
+        ...(availability.readResult?.slots || []),
+        ...(availability.readResult?.unconstrainedFutureSlots || [])
+      ]
     };
     if (dayFirstOffer) {
       structured.reasonCodes.push(REASON_CODES.DAY_FIRST_AVAILABILITY_OFFERED);
+      structured.reasonCodes.push(REASON_CODES.DAY_FIRST_DAYPART_SLOT_HONESTY);
       structured.reasonCodes.push(REASON_CODES.NO_STALE_TIME_FALLBACK);
     }
     structured.reasonCodes.push(REASON_CODES.AVAILABLE_SLOTS_OFFERED);

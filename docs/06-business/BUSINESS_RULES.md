@@ -3669,8 +3669,8 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Depends on:** BR-088, BR-097, BR-131, BR-147, BR-155, BR-164, BR-195, BR-196  
 **Related:** BR-224 (work-auth / tenant handoff branding); BR-225 / BR-226 (tenant office / coverage); BR-227 (AI Quality evidence — do not depend)  
 **Status:** Implemented — merged  
-**Engine target:** `languageLibrary.isBareConversationalYes`; `qualificationFacts.parseWorkAuthorizationAnswer`; `conversationContinuity`; `interpreter`; `decisionEngine`; `responseRenderer`; `schedulingAvailabilityReader`; `recruitingFirstTurnBurst`; `whatsappInboundPipeline`  
-**Tests:** `backend/test/recruitAiV2OffpathContinuityBr229.test.js`; `backend/test/recruitingFirstTurnBurstDedup.test.js`; `backend/test/recruitAiV2VisionariesSchedulingContinuity.test.js`
+**Engine target:** `languageLibrary.isBareConversationalYes`; `qualificationFacts.parseWorkAuthorizationAnswer`; `conversationContinuity`; `interpreter`; `decisionEngine`; `responseRenderer`; `schedulingAvailabilityReader`; `recruitingFirstTurnBurst`; `whatsappInboundPipeline`; `dayPartClassification` (BR-231)  
+**Tests:** `backend/test/recruitAiV2OffpathContinuityBr229.test.js`; `backend/test/recruitingFirstTurnBurstDedup.test.js`; `backend/test/recruitAiV2VisionariesSchedulingContinuity.test.js`; `backend/test/recruitAiV2DayFirstDayPartHonesty.test.js`
 
 ### Rules
 
@@ -3682,7 +3682,28 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 6. **Tenant identity** — Handoff and office copy may say Team Vision only for the Team Vision seed tenant. Other tenants must not leak Team Vision branding or the Doral office address. Canonical branding is BR-224 `tenantBranding` / `organizationName`, not a string-strip workaround.
 7. **No contact-specific or tenant-only behavior hacks** — Shared Recruit V2 only. Do not enable semantic APPLY. AI Quality case emission for `DUPLICATE_GREETING` / `PENDING_ANSWER_REJECTED` / `FAQ_RESUME_FAILURE` / `PREMATURE_HANDOFF` is a follow-up (reason codes exist; BR-227 is not required).
 8. **Office / interview hours FAQ** — Phrases such as `a qué horas trabajas`, `qué horarios tienen`, `qué horas están allá`, and English equivalents are `OFFICE_HOURS_QUESTION`. Answer naturally, keep in-person / Zoom / day-part / last-question state, and resume the pending scheduling question. Never emit `clarify_once` for a recognized hours FAQ. An OUTSIDE prospect who requested in-person (`puede ser presencial`) keeps that modality until they change it; do not silently revert to Zoom.
-9. **Day-first when date is unknown** — If the prospect has only a day-part (`en la mañana`) or asks `Qué día puede ser` / `Qué días tienes` while date is unresolved, query real recruiting availability and offer available **days** first. Do not use “después de las esa hora ese día” or any “esa hora” / “ese día” wording unless an actual clock or day exists in scheduling state. Zero availability must name only the known constraint (morning / in-person / after a real time). Exact date+time booking and IUL day-first (BR-220) stay unchanged.
+9. **Day-first when date is unknown** — If the prospect has only a day-part (`en la mañana`) or asks `Qué día puede ser` / `Qué días tienes` while date is unresolved, query real recruiting availability and offer available **days** first. Do not use “después de las esa hora ese día” or any “esa hora” / “ese día” wording unless an actual clock or day exists in scheduling state. Zero availability must name only the known constraint (morning / in-person / after a real time). Exact date+time booking and IUL day-first (BR-220) stay unchanged. Day-part labels on those days follow BR-231: never claim `[day] en la mañana/tarde` unless a returned slot on that date honestly supports that day-part.
+
+---
+
+## BR-231 — Day-first day-part claims require returned slot evidence
+
+**Implements:** Recruit AI v2 must not say a day is available in the requested morning/afternoon unless real returned slots classify into that day-part. A late-morning boundary slot (11:30–11:59) may be offered as the earliest alternative without advertising the day as morning.  
+**Domain:** Recruit AI v2 / recruiting scheduling conversation  
+**Depends on:** BR-107, BR-108, BR-119, BR-164, BR-229  
+**Related:** BR-085, BR-101, BR-220 (IUL day-first unchanged)  
+**Status:** Implemented in code; **execution remains OFF**  
+**Engine target:** `dayPartClassification`; `responseRenderer.composeDayFirstAvailability`; `decisionEngine.tryApplyAvailabilityOffer`  
+**Tests:** `backend/test/recruitAiV2DayFirstDayPartHonesty.test.js`
+
+### Rules
+
+1. **Evidence over preference** — Day-part labels come from classified returned slots, not only `requestedDayPart` / `preferredDayPart`.
+2. **Canonical windows unchanged for booking** — Morning `< 12:00`, afternoon strictly after `12:00`, evening `>= 17:00`. Confirmation-time safety (BR-190 / #366), offered-slot narrowing, and IUL day-part matching stay on these windows.
+3. **True morning for day claims** — A day may be advertised as morning only when a returned slot on that date starts before `11:30`. `11:45` is near-boundary: offer it as the earliest available time, do not say “domingo en la mañana”.
+4. **Same-day alternative + next true morning** — If the next calendar day has no true requested-daypart slots, Atlas may name the earliest real slot on that day and, when helpful, the next day that does have requested-daypart slots. Do not overwrite the prospect’s preferred day-part.
+5. **Search forward from live availability** — A daypart-only request (`En la mañana`) uses the shared scheduling reader and configured working hours. Do not assume tomorrow supports that day-part.
+6. **Boundaries** — Do not change IUL scheduling, tenant isolation, human takeover, iCloud overlay degrade, or confirmation-time booking safety.
 
 ---
 
