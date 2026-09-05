@@ -108,6 +108,14 @@ and does not insert another row.
 
 New table `tiktok_live_engagements` (migration `072_tiktok_live_engagements.sql`). No `prospect_id`. Backend service-role only.
 
+## Read-only Atlas UI
+
+Authenticated RVP / Admin users can open **Growth → TikTok LIVE** (`/app/tiktok-live-engagements`).
+
+`GET /api/tiktok-live-engagements` returns the current tenant’s captured rows only (session `organizationId`). It does not accept a foreign org, create prospects, or expose `TIKFINITY_WEBHOOK_SECRET`.
+
+Empty state: `No TikTok LIVE engagements captured yet.`
+
 ## Env
 
 ```
