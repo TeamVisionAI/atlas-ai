@@ -1,6 +1,7 @@
 /**
  * BR-161 — iCloud availability adapter.
- * Read-only busy windows. Fail-closed auth/unavailable errors propagate.
+ * Read-only busy windows. Auth/unavailable errors propagate to the
+ * scheduling engine, which degrades the overlay instead of zeroing slots.
  */
 
 const icloudCalendarIntegrationService = require("../../services/icloudCalendarIntegrationService");

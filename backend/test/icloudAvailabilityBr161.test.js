@@ -301,26 +301,27 @@ END:VEVENT`);
     );
   });
 
-  test("13. connected iCloud 401/403 fails closed", async () => {
+  test("13. connected iCloud 401/403 degrades and keeps Google/schedule slots", async () => {
     const result = await tuesdaySlots({
       icloudBusy: () => {
         throw createAvailabilityAuthError("ICLOUD_RECONNECT_REQUIRED");
       }
     });
-    assert.deepEqual(result.slots, []);
-    assert.match(result.conflictExplanation, /Reconnect Apple Calendar/);
-    assert.equal(result.availabilityBlockedReason, "ICLOUD_RECONNECT_REQUIRED");
+    assert.ok(result.slots.length > 0);
+    assert.equal(result.availabilityBlockedReason, undefined);
+    assert.equal(result.icloudOverlaySkippedReason, "ICLOUD_RECONNECT_REQUIRED");
+    assert.doesNotMatch(String(result.conflictExplanation || ""), /Reconnect Apple Calendar/);
   });
 
-  test("14. transient Apple failure does not fail open", async () => {
+  test("14. transient Apple failure degrades instead of zeroing slots", async () => {
     const result = await tuesdaySlots({
       icloudBusy: () => {
         throw createAvailabilityUnavailableError("ICLOUD_UNAVAILABLE");
       }
     });
-    assert.deepEqual(result.slots, []);
-    assert.match(result.conflictExplanation, /temporarily unavailable/);
-    assert.equal(result.availabilityBlockedReason, "ICLOUD_UNAVAILABLE");
+    assert.ok(result.slots.length > 0);
+    assert.equal(result.availabilityBlockedReason, undefined);
+    assert.equal(result.icloudOverlaySkippedReason, "ICLOUD_UNAVAILABLE");
   });
 
   test("15. confirm-time recheck catches newly created iCloud conflict", async () => {
