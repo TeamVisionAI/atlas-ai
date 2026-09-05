@@ -4422,7 +4422,17 @@ function decideSafeFailure({ context, interpretation, failureReason = null } = {
 }
 
 function decideConversationTurn(args = {}) {
-  return ensureExplicitOutboundDecision(decideConversationTurnCore(args));
+  const structured = ensureExplicitOutboundDecision(decideConversationTurnCore(args));
+  try {
+    // Implements BR-236 — measurement only; never changes the decision.
+    const {
+      emitLocationResolutionFromDecision
+    } = require("./locationResolutionObservability");
+    emitLocationResolutionFromDecision(args.context, args.interpretation, structured);
+  } catch {
+    // BR-236 — observability must never change the decision.
+  }
+  return structured;
 }
 
 module.exports = {
