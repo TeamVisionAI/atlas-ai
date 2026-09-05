@@ -98,7 +98,6 @@ export async function updateTenantFeatures(id, payload) {
   });
 }
 
-
 export async function updateTenantBilling(id, payload) {
   return apiFetch(`/api/platform/tenants/${id}/billing`, {
     method: "PATCH",
@@ -187,6 +186,21 @@ export async function getAiQualityLearningReport(query = {}) {
 
 export async function applyAiQualityLearningAction(id, payload) {
   return apiFetch(`/api/platform/ai-quality/cases/${id}/learning-actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function findCanaryCandidates({ organizationId, q } = {}) {
+  const params = new URLSearchParams();
+  if (organizationId) params.set("organizationId", organizationId);
+  if (q) params.set("q", q);
+  return apiFetch(`/api/platform/canary-candidates?${params.toString()}`);
+}
+
+export async function markCanaryProspectAsTest(payload) {
+  return apiFetch("/api/platform/canary-mark-test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)

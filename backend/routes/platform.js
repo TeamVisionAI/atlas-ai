@@ -13,6 +13,7 @@ const {
 
 const platformBillingRoutes = require("./platformBilling");
 const platformAiQualityRoutes = require("./platformAiQuality");
+const platformCanaryRoutes = require("./platformCanary");
 const { resetCanaryProspect } = require("../core/canaryResetService");
 
 const router = express.Router();
@@ -303,6 +304,7 @@ router.get("/whatsapp-inbound-webhooks", async (req, res) => {
 });
 
 router.use("/ai-quality", platformAiQualityRoutes);
+router.use(platformCanaryRoutes);
 
 router.post("/canary-reset", async (req, res) => {
   try {

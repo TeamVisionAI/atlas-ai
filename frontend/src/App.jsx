@@ -22,6 +22,7 @@ import AcceptInvitation from "./pages/auth/AcceptInvitation";
 import AdminUsers from "./pages/identity/AdminUsers";
 import PlatformTenantsPage from "./pages/platform/PlatformTenantsPage";
 import AiQualityPage from "./pages/platform/AiQualityPage";
+import CanaryResetPage from "./pages/platform/CanaryResetPage";
 import MyAccount from "./pages/identity/MyAccount";
 import NotificationsPage from "./pages/NotificationsPage";
 import SetupWizard from "./pages/identity/SetupWizard";
@@ -200,6 +201,7 @@ export default function App() {
         <Route path="admin/users" element={<AdminUsers />} />
         <Route path="platform/tenants" element={<PlatformTenantsPage />} />
         <Route path="platform/ai-quality" element={<AiQualityPage />} />
+        <Route path="platform/canary-reset" element={<CanaryResetPage />} />
         <Route path="operations-center/*" element={<OperationsCenter />} />
       </Route>
 
