@@ -475,31 +475,87 @@ function joinDayPhrases(phrases, language) {
   return `${phrases.slice(0, -1).join(", ")}, and ${phrases[phrases.length - 1]}`;
 }
 
+function weekdayOnlyPhrase(dateKey, language) {
+  if (!dateKey) {
+    return null;
+  }
+  const { WEEKDAY_LABELS } = require("./dateResolution");
+  const [year, month, day] = String(dateKey).split("-").map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  const weekdayIndex = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).getUTCDay();
+  const weekday =
+    language === LANGUAGES.SPANISH
+      ? WEEKDAY_LABELS.es[weekdayIndex]
+      : WEEKDAY_LABELS.en[weekdayIndex];
+  return language === LANGUAGES.SPANISH ? `el ${weekday}` : weekday;
+}
+
 function composeDayFirstAvailability(language, entities = {}) {
+  const {
+    buildDayFirstDayPartView
+  } = require("./dayPartClassification");
   const offered = Array.isArray(entities.offeredSlots) ? entities.offeredSlots : [];
+  const evidence = Array.isArray(entities.dayFirstEvidenceSlots)
+    ? entities.dayFirstEvidenceSlots
+    : [];
   const dayOptions = {
     now: entities.now || null,
-    timezone: entities.timezone || offered[0]?.timezone || null
+    timezone: entities.timezone || offered[0]?.timezone || evidence[0]?.timezone || null
   };
-  const dayKeys = uniqueOfferedDayKeys(offered);
-  const phrases = dayKeys
+  const requestedDayPart = entities.dayPart || entities.preferredDayPart || null;
+  const view = buildDayFirstDayPartView({
+    offeredSlots: offered,
+    extraSlots: evidence,
+    requestedDayPart
+  });
+  const part = dayPartConstraintPhrase(view.requestedDayPart, language);
+  const es = language === LANGUAGES.SPANISH;
+
+  // Implements BR-231 — do not claim a day+daypart unless returned slots support it.
+  if (view.unavailableDayPartDate && view.earliestAlternative && part) {
+    const missedDay =
+      weekdayOnlyPhrase(view.unavailableDayPartDate, language) ||
+      formatSlotDayPhrase(view.unavailableDayPartDate, language, dayOptions);
+    const earliest = formatRequestedTime(
+      view.earliestAlternative.time || view.earliestAlternative.timeKey,
+      language
+    );
+    const nextDay =
+      view.nextDayPartDay && view.nextDayPartDay !== view.unavailableDayPartDate
+        ? formatSlotDayPhrase(view.nextDayPartDay, language, dayOptions)
+        : null;
+    const opening = es
+      ? `${part.charAt(0).toUpperCase()}${part.slice(1)} no tengo disponibilidad ${missedDay}. Lo más temprano que tengo es a las ${earliest}.`
+      : `I don't have ${part} availability on ${missedDay}. The earliest I have is ${earliest}.`;
+    if (nextDay) {
+      return es
+        ? `${opening} Si prefieres una hora más temprano ${part}, ${nextDay} tengo disponibilidad.`
+        : `${opening} If you prefer an earlier time ${part}, ${nextDay} has availability.`;
+    }
+    return opening;
+  }
+
+  const claimDayKeys = view.requestedDayPart
+    ? view.claimDays
+    : uniqueOfferedDayKeys(offered);
+  const phrases = claimDayKeys
     .map((key) => formatSlotDayPhrase(key, language, dayOptions))
     .filter(Boolean);
-  const part = dayPartConstraintPhrase(
-    entities.dayPart || entities.preferredDayPart,
-    language
-  );
   const joined = joinDayPhrases(phrases, language);
   if (!joined) {
     return composeAskAvailableDay(language, entities);
   }
-  if (language === LANGUAGES.SPANISH) {
-    return part
-      ? `Tengo disponible ${joined} ${part}. ¿Qué día te funciona?`
+  const claimPart =
+    view.requestedDayPart && view.claimDays.length > 0 ? part : "";
+  if (es) {
+    return claimPart
+      ? `Tengo disponible ${joined} ${claimPart}. ¿Qué día te funciona?`
       : `Tengo disponible ${joined}. ¿Qué día te funciona?`;
   }
-  return part
-    ? `I have availability ${joined} ${part}. Which day works for you?`
+  return claimPart
+    ? `I have availability ${joined} ${claimPart}. Which day works for you?`
     : `I have availability ${joined}. Which day works for you?`;
 }
 
