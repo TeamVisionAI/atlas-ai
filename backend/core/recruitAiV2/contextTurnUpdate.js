@@ -314,6 +314,13 @@ function buildNextContextFromInterpretation({
         dateExclusions: interpretation.entities.dateExclusions
       };
     }
+    // Implements BR-085 — compound date + day-part overwrites stale preferredDayPart.
+    if (interpretation.entities.dayPart) {
+      nextContext.knownFacts = {
+        ...nextContext.knownFacts,
+        preferredDayPart: interpretation.entities.dayPart
+      };
+    }
   }
 
   if (

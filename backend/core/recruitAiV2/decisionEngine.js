@@ -3221,17 +3221,23 @@ function decideConversationTurnCore({
       structured.reasonCodes.push(REASON_CODES.REQUESTED_LATER_ALTERNATIVES);
     }
 
+    // Implements BR-085 — same-turn day-part on a date proposal overwrites stale morning/afternoon.
+    const dateKnownFacts = {
+      dateExclusions: exclusions.length
+        ? exclusions
+        : context.knownFacts?.dateExclusions || [],
+      ...(interpretation.entities?.dayPart
+        ? { preferredDayPart: interpretation.entities.dayPart }
+        : {})
+    };
+
     if (priorTime && !requestsLater) {
       structured.decision.nextAction = NEXT_ACTIONS.CONFIRM_DATE_WITH_TIME;
       structured.customerReplyPlan.templateKey = "confirm_date_with_time";
       structured.reasonCodes.push(REASON_CODES.PRIOR_TIME_PRESERVED_WITH_DATE);
       structured.contextPatch = {
         currentStage: STAGES.SCHEDULING,
-        knownFacts: {
-          dateExclusions: exclusions.length
-            ? exclusions
-            : context.knownFacts?.dateExclusions || []
-        },
+        knownFacts: dateKnownFacts,
         appointment: {
           status: APPOINTMENT_STATUS.PROPOSED,
           proposedDate: resolvedDate?.isoDate || null,
@@ -3253,11 +3259,7 @@ function decideConversationTurnCore({
     // Implements BR-107 — with concrete date + prior constraint, offer real slots when read succeeds.
     // Implements BR-119 Case D — "más tarde" falls through here to query alternatives.
     const dateConstraintPatch = {
-      knownFacts: {
-        dateExclusions: exclusions.length
-          ? exclusions
-          : context.knownFacts?.dateExclusions || []
-      },
+      knownFacts: dateKnownFacts,
       appointment: {
         status: APPOINTMENT_STATUS.PROPOSED,
         proposedDate: resolvedDate?.isoDate || null,
@@ -3286,11 +3288,7 @@ function decideConversationTurnCore({
     structured.customerReplyPlan.templateKey = "acknowledge_date_ask_time";
     structured.contextPatch = {
       currentStage: STAGES.SCHEDULING,
-      knownFacts: {
-        dateExclusions: exclusions.length
-          ? exclusions
-          : context.knownFacts?.dateExclusions || []
-      },
+      knownFacts: dateKnownFacts,
       appointment: {
         status: APPOINTMENT_STATUS.PROPOSED,
         proposedDate: resolvedDate?.isoDate || null,
