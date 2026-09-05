@@ -451,6 +451,19 @@ function emptyMeetingManagement() {
   };
 }
 
+function emptyTiktokLiveEngagements() {
+  return {
+    organizationId: null,
+    summary: {
+      total: 0,
+      iul: 0,
+      recruiting: 0,
+      lastReceivedAt: null
+    },
+    items: []
+  };
+}
+
 function operationalControlPlaneEmpty(buildEmpty) {
   return function operationalControlPlaneEmptyMiddleware(req, res, next) {
     if (!isControlPlaneRequest(req) && !isGlobalSuperAdminControlPlane(req.authContext, req.supportContext)) {
@@ -498,5 +511,6 @@ module.exports = {
   emptyAppointmentProfile,
   emptyOrganizationConfiguration,
   emptyMeetingManagement,
+  emptyTiktokLiveEngagements,
   operationalControlPlaneEmpty
 };

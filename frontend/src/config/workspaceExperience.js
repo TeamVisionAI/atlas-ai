@@ -206,6 +206,13 @@ const NAV_ITEM_DEFS = Object.freeze({
     workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.PROSPECT_ASSIGN
   },
+  tiktokLiveEngagements: {
+    id: "tiktok-live-engagements",
+    path: appPath("tiktok-live-engagements"),
+    labelKey: "navTiktokLiveEngagements",
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.PROSPECT_READ
+  },
   analytics: {
     id: "analytics",
     path: appPath("analytics"),
@@ -302,8 +309,8 @@ const WORKSPACE_LANDING_NAV = Object.freeze({
 
 /** Leadership extensions beyond core Business (still permission-gated). */
 const LEADERSHIP_EXTENSION_NAV = Object.freeze({
-  [WORKSPACE_TYPES.ADMINISTRATOR]: ["analytics"],
-  [WORKSPACE_TYPES.MANAGEMENT]: ["recruiting", "analytics"],
+  [WORKSPACE_TYPES.ADMINISTRATOR]: ["tiktokLiveEngagements", "analytics"],
+  [WORKSPACE_TYPES.MANAGEMENT]: ["recruiting", "tiktokLiveEngagements", "analytics"],
   [WORKSPACE_TYPES.REPRESENTATIVE]: []
 });
 
@@ -392,6 +399,10 @@ export const ROUTE_ACCESS = Object.freeze({
   recruiting: {
     workspaceTypes: [WORKSPACE_TYPES.MANAGEMENT],
     permission: PERMISSIONS.PROSPECT_ASSIGN
+  },
+  "tiktok-live-engagements": {
+    workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],
+    permission: PERMISSIONS.PROSPECT_READ
   },
   analytics: {
     workspaceTypes: [WORKSPACE_TYPES.ADMINISTRATOR, WORKSPACE_TYPES.MANAGEMENT],

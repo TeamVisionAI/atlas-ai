@@ -3739,8 +3739,8 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Depends on:** tenant organization identity  
 **Related:** future LIVE → WhatsApp / QR correlation (not this rule)  
 **Status:** Implemented — not merged  
-**Engine target:** `tikfinityLiveEventService`; `routes/tikfinityLiveEvent`  
-**Tests:** `backend/test/tikfinityLiveEventBridge.test.js`  
+**Engine target:** `tikfinityLiveEventService`; `routes/tikfinityLiveEvent`; `routes/tiktokLiveEngagements`; `TiktokLiveEngagementsPage`  
+**Tests:** `backend/test/tikfinityLiveEventBridge.test.js`; `backend/test/tiktokLiveEngagementsReadUi.test.js`  
 **Docs:** `docs/integrations/tikfinity-live.md`
 
 ### Rules
@@ -3751,6 +3751,7 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 4. **Command whitelist** — Normalize `/iul`, `?IUL`, `IUL` → `IUL` and `/trabajo` → `TRABAJO`. Unknown commands return `400`.
 5. **Dedupe** — Same org + username + command + command text inside a short window must not create unlimited rows. Safe duplicate response may return `recorded: false`.
 6. **Boundaries** — Do not change Recruit AI, WhatsApp eligibility, campaigns, scheduling, or tenant grants.
+7. **Read-only Atlas surface** — Authenticated tenant users may view their own `tiktok_live_engagements` on `/app/tiktok-live-engagements` via `GET /api/tiktok-live-engagements`. Organization comes from session tenant context only. Super Admin without Support Mode sees an empty control-plane payload. Do not accept another tenant’s `organizationId`. Do not expose the TikFinity secret, webhook URL, or `raw_metadata`. No create / edit / delete / prospect / WhatsApp / Recruit AI / appointment actions. Empty copy: `No TikTok LIVE engagements captured yet.`
 
 ---
 

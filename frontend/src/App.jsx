@@ -40,6 +40,7 @@ import ClientsPage from "./pages/ClientsPage";
 import ProductionPage from "./pages/ProductionPage";
 import ServicePage from "./pages/ServicePage";
 import PolicyReviewsPage from "./pages/PolicyReviewsPage";
+import TiktokLiveEngagementsPage from "./pages/TiktokLiveEngagementsPage";
 import IulFollowUpWorklistPage from "./pages/IulFollowUpWorklistPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import Prospect from "./pages/Prospect";
@@ -167,6 +168,7 @@ export default function App() {
         <Route path="production" element={<ProductionPage />} />
         <Route path="service" element={<ServicePage />} />
         <Route path="policy-reviews" element={<PolicyReviewsPage />} />
+        <Route path="tiktok-live-engagements" element={<TiktokLiveEngagementsPage />} />
         <Route
           path="recruiting"
           element={

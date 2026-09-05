@@ -143,6 +143,12 @@ function createMemoryTiktokLiveEngagementStore(seed = []) {
           return Date.parse(row.received_at) >= since;
         }) || null
       );
+    },
+    async listByOrganization({ organizationId, limit }) {
+      const scoped = rows.filter(
+        (row) => String(row.organization_id) === String(organizationId)
+      );
+      return buildEngagementListPayload(organizationId, scoped, limit);
     }
   };
 }
@@ -185,6 +191,18 @@ function createSupabaseEngagementStore(supabase) {
         throw error;
       }
       return data || null;
+    },
+    async listByOrganization({ organizationId, limit }) {
+      const { data, error } = await supabase
+        .from("tiktok_live_engagements")
+        .select("id, username, command, campaign, funnel, received_at")
+        .eq("organization_id", organizationId)
+        .order("received_at", { ascending: false })
+        .limit(500);
+      if (error) {
+        throw error;
+      }
+      return buildEngagementListPayload(organizationId, data || [], limit);
     }
   };
 }
@@ -205,6 +223,89 @@ async function defaultFindOrganization(organizationId) {
 function defaultEngagementStore() {
   const { supabase } = require("../../services/supabaseService");
   return createSupabaseEngagementStore(supabase);
+}
+
+function clampListLimit(limit) {
+  const parsed = Number(limit);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 50;
+  }
+  return Math.min(100, Math.floor(parsed));
+}
+
+function emptyEngagementSummary() {
+  return {
+    total: 0,
+    iul: 0,
+    recruiting: 0,
+    lastReceivedAt: null
+  };
+}
+
+function toPublicEngagement(row) {
+  return {
+    id: row.id || null,
+    username: row.username || null,
+    command: row.command || null,
+    campaign: row.campaign || null,
+    funnel: row.funnel || null,
+    receivedAt: row.received_at || row.receivedAt || null,
+    status: "Captured"
+  };
+}
+
+function buildEngagementListPayload(organizationId, rows, limit) {
+  const scoped = Array.isArray(rows) ? rows.slice() : [];
+  scoped.sort((left, right) => {
+    return Date.parse(right.received_at || right.receivedAt || 0)
+      - Date.parse(left.received_at || left.receivedAt || 0);
+  });
+  const summary = emptyEngagementSummary();
+  summary.total = scoped.length;
+  for (const row of scoped) {
+    if (String(row.command || "").toUpperCase() === "IUL") {
+      summary.iul += 1;
+    }
+    if (String(row.command || "").toUpperCase() === "TRABAJO") {
+      summary.recruiting += 1;
+    }
+  }
+  summary.lastReceivedAt = scoped[0]?.received_at || scoped[0]?.receivedAt || null;
+  return {
+    organizationId,
+    summary,
+    items: scoped.slice(0, clampListLimit(limit)).map(toPublicEngagement)
+  };
+}
+
+/**
+ * Implements BR-230 — tenant-scoped read of captured LIVE engagements.
+ * Session org only. Never infers tenant from username or query.
+ */
+async function listTiktokLiveEngagements(
+  { organizationId, limit } = {},
+  dependencies = {}
+) {
+  if (!isUuid(organizationId)) {
+    return {
+      organizationId: null,
+      summary: emptyEngagementSummary(),
+      items: []
+    };
+  }
+
+  const store = dependencies.engagementStore || defaultEngagementStore();
+  try {
+    return await store.listByOrganization({
+      organizationId,
+      limit: clampListLimit(limit)
+    });
+  } catch {
+    const error = new Error("ENGAGEMENT_LIST_FAILED");
+    error.statusCode = 500;
+    error.publicCode = "ENGAGEMENT_LIST_FAILED";
+    throw error;
+  }
 }
 
 async function recordTikfinityLiveEvent(req, dependencies = {}) {
@@ -381,7 +482,9 @@ module.exports = {
   SOURCE,
   collectLiveEventInput,
   createMemoryTiktokLiveEngagementStore,
+  emptyEngagementSummary,
   isAllowedCommand,
+  listTiktokLiveEngagements,
   normalizeCommand,
   recordTikfinityLiveEvent,
   secretsMatch

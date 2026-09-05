@@ -57,7 +57,10 @@ const GROUP_PATHS = Object.freeze({
     appPath("policy-intelligence"),
     appPath("policy-reviews")
   ]),
-  [SIDEBAR_NAV_GROUPS.GROWTH]: Object.freeze([appPath("recruiting")])
+  [SIDEBAR_NAV_GROUPS.GROWTH]: Object.freeze([
+    appPath("recruiting"),
+    appPath("tiktok-live-engagements")
+  ])
 });
 
 const PATH_TO_GROUP = Object.freeze(
