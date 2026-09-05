@@ -1,14 +1,17 @@
 /**
- * BR-156 — Unsupported Meta WhatsApp inbound review service.
+ * BR-156 / BR-234 — Unsupported Meta WhatsApp inbound review service.
  * Operational recovery only; BR-142 eligibility unchanged.
+ * BR-234 allows contact-only 131060 reviews when no prospect exists.
  */
 
 const {
   REVIEW_TYPE,
   REVIEW_STATUS,
   META_UNSUPPORTED_LEAD_ERROR_CODE,
+  REVIEW_REASON,
   AUDIT_EVENT_TYPES
 } = require("./constants");
+const { ROLES } = require("../../security/roles");
 const {
   shouldCreateUnsupportedInboundReview,
   extractMetaMessageErrors
@@ -117,7 +120,11 @@ async function maybeCreateUnsupportedInboundReview({
   }
 
   const providerMessageId = String(inbound?.providerMessageId || "").trim();
-  if (!providerMessageId || !prospect?.id || !organizationId) {
+  const senderPhone = String(prospect?.phone || inbound?.phoneE164 || inbound?.phone || "").trim();
+  const phoneNumberId =
+    inbound?.phoneNumberId || inbound?.rawValue?.metadata?.phone_number_id || null;
+  // Implements BR-234 — prospect.id is optional; org + sender + destination stay required.
+  if (!providerMessageId || !organizationId || !senderPhone || !phoneNumberId) {
     return { created: false, reason: "MISSING_REQUIRED_FIELDS" };
   }
 
@@ -129,19 +136,27 @@ async function maybeCreateUnsupportedInboundReview({
   const metaErrors = extractMetaMessageErrors(inbound?.rawMessage);
   const metaError = metaErrors.find((entry) => entry.code === META_UNSUPPORTED_LEAD_ERROR_CODE) || {};
 
-  const phoneNumberId =
-    inbound.phoneNumberId || inbound.rawValue?.metadata?.phone_number_id || null;
   const displayPhoneNumber = inbound.rawValue?.metadata?.display_phone_number || null;
+  const contactOnly = !prospect?.id;
+  const metadata = contactOnly
+    ? {
+        messageType: inbound.messageType || "unsupported",
+        reviewReason: REVIEW_REASON.META_UNSUPPORTED_131060_CONTACT_ONLY,
+        contactOnly: true
+      }
+    : {
+        messageType: inbound.messageType || "unsupported"
+      };
 
   const result = await reviewRepository.insertReview({
     reviewType: REVIEW_TYPE.UNSUPPORTED_WHATSAPP_INBOUND_REVIEW,
     organizationId,
-    prospectId: prospect.id,
-    ownerUserId: prospect.owner_user_id || null,
-    assignedOwnerUserId: prospect.owner_user_id || null,
-    senderPhoneE164: prospect.phone || inbound.phoneE164 || inbound.phone,
-    whatsappSenderId: inbound.whatsappSenderId || prospect.whatsapp_sender_id || null,
-    prospectName: prospect.name || inbound.contactName || null,
+    prospectId: prospect?.id || null,
+    ownerUserId: prospect?.owner_user_id || null,
+    assignedOwnerUserId: prospect?.owner_user_id || null,
+    senderPhoneE164: senderPhone,
+    whatsappSenderId: inbound.whatsappSenderId || prospect?.whatsapp_sender_id || null,
+    prospectName: prospect?.name || inbound.contactName || null,
     providerMessageId,
     destinationPhoneNumberId: phoneNumberId,
     destinationDisplayPhoneNumber: displayPhoneNumber,
@@ -152,9 +167,7 @@ async function maybeCreateUnsupportedInboundReview({
     conversationLogId,
     correlationId,
     receivedAt: inbound.timestamp || new Date().toISOString(),
-    metadata: {
-      messageType: inbound.messageType || "unsupported"
-    }
+    metadata
   });
 
   if (!result.ok) {
@@ -162,25 +175,27 @@ async function maybeCreateUnsupportedInboundReview({
       level: "warn",
       providerMessageId,
       reason: result.reason,
-      phone: prospect.phone || null
+      phone: senderPhone || null
     });
     return { created: false, reason: result.reason };
   }
 
   logWhatsAppStage("unsupported_whatsapp_inbound_review_created", {
-    phone: prospect.phone || null,
+    phone: senderPhone || null,
     providerMessageId,
     reviewId: result.row.id,
-    organizationId
+    organizationId,
+    contactOnly
   });
 
-  if (prospect?.phone) {
+  // Do not write pendingUnsupportedMetaRecovery without a prospect (BR-234).
+  if (prospect?.id && prospect?.phone) {
     await savePersistedWorkflowState(
       prospect.phone,
       { pendingUnsupportedMetaRecovery: true },
       {
         organizationId: organizationId || prospect.organization_id || null,
-        prospectId: prospect.id || null
+        prospectId: prospect.id
       }
     ).catch(() => null);
   }
@@ -262,6 +277,13 @@ async function listPendingReviewsForRequest({ organizationId, authContext, limit
   });
 }
 
+function canDismissContactOnlyReview(authContext, organizationId) {
+  if (!authContext || String(authContext.organizationId || "") !== String(organizationId || "")) {
+    return false;
+  }
+  return authContext.role === ROLES.ADMINISTRATOR || authContext.role === ROLES.RVP;
+}
+
 async function dismissUnsupportedInboundReview({
   reviewId,
   organizationId,
@@ -274,9 +296,17 @@ async function dismissUnsupportedInboundReview({
     return { ok: false, reason: "NOT_FOUND", status: 404 };
   }
 
-  const prospect = await findProspect(review.senderPhoneE164, organizationId);
-  if (!prospect || !canAcknowledgeProspect(authContext, prospect)) {
-    return { ok: false, reason: "FORBIDDEN", status: 403 };
+  const contactOnly = !review.prospectId;
+  let prospect = null;
+  if (contactOnly) {
+    if (!canDismissContactOnlyReview(authContext, organizationId)) {
+      return { ok: false, reason: "FORBIDDEN", status: 403 };
+    }
+  } else {
+    prospect = await findProspect(review.senderPhoneE164, organizationId);
+    if (!prospect || !canAcknowledgeProspect(authContext, prospect)) {
+      return { ok: false, reason: "FORBIDDEN", status: 403 };
+    }
   }
 
   if (review.status !== REVIEW_STATUS.PENDING_REVIEW) {
@@ -295,12 +325,14 @@ async function dismissUnsupportedInboundReview({
 
   await emitReviewAudit(AUDIT_EVENT_TYPES.DISMISSED, {
     organizationId,
-    prospect,
+    prospect: prospect || { phone: review.senderPhoneE164 },
     review: patchResult.row,
     actorUserId: authContext.userId
   });
 
-  await clearPendingUnsupportedMetaRecoveryFlag(prospect, organizationId);
+  if (prospect) {
+    await clearPendingUnsupportedMetaRecoveryFlag(prospect, organizationId);
+  }
 
   return { ok: true, review: patchResult.row };
 }
@@ -323,6 +355,11 @@ async function confirmUnsupportedInboundReview({
   const review = await findReviewInOrganization(reviewId, organizationId);
   if (!review) {
     return { ok: false, reason: "NOT_FOUND", status: 404 };
+  }
+
+  // Implements BR-234 — contact-only reviews are not a promotion path.
+  if (!review.prospectId) {
+    return { ok: false, reason: "CONTACT_ONLY_NO_PROSPECT", status: 400 };
   }
 
   const prospect = await findProspect(review.senderPhoneE164, organizationId);

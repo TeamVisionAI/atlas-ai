@@ -615,7 +615,7 @@ export default function MainLayout() {
 
   const handleConfirmUnsupportedReview = useCallback(
     async (review) => {
-      if (!review?.id) {
+      if (!review?.id || !review.prospectId) {
         return;
       }
 

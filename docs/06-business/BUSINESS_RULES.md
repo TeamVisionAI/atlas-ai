@@ -3750,6 +3750,27 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-234 — Contact-only Meta 131060 operational review
+
+**Implements:** When Meta delivers `message_type=unsupported` with error `131060` on a known organization WhatsApp line and a known sender phone, but no prospect exists, create an operational review so the tenant can recover the lead manually. This is not a promotion path, not Recruit AI, and not an auto-reply path.  
+**Domain:** WhatsApp inbound / operational review  
+**Depends on:** BR-156, BR-142, BR-147, BR-159  
+**Related:** BR-193, BR-201, BR-203  
+**Status:** Implemented  
+**Engine target:** `unsupportedWhatsAppInboundReviewService.maybeCreateUnsupportedInboundReview`  
+**Tests:** `backend/test/unsupportedWhatsAppInboundContactOnlyBr234.test.js`; `backend/test/unsupportedWhatsAppInboundReview.test.js`
+
+### Rules
+
+1. **Contact-only review** — Create a pending review when: unsupported + Meta 131060 + resolved `organization_id` + known sender phone + no `prospect_id`. Reason `META_UNSUPPORTED_131060_CONTACT_ONLY`. Store org, sender phone, destination `phone_number_id`, `provider_message_id`, message type, error 131060, and `received_at`. Do not invent ad text, intake code, referral, or `ctwa_clid`.
+2. **Nullable prospect** — `prospect_id` may be null on this review type only. Existing BR-156 prospect-backed reviews stay unchanged.
+3. **Tenant visibility** — Same-org RVP/admin see the existing unsupported-review banner. Contact-only copy tells operators Meta could not read the ad lead. Dismiss is allowed. Confirm / open-prospect / intake attribution are not.
+4. **Dedupe** — One review per `provider_message_id`. Missing provider id fails closed.
+5. **Fail-closed** — Do not create a prospect, promote CONTACT, start Recruit V2, send Atlas WhatsApp, enable BR-193, treat 131060 as CTWA, or infer campaign. Personal / unknown inbound stays out of this queue. Non-131060 unsupported contact-only stays unchanged.
+6. **Tenant isolation** — Reviews are scoped by `organization_id`.
+
+---
+
 ## BR-227 — AI Quality Evidence Integrity + Approval Safety
 
 **Implements:** AI Quality cases and learning proposals must be grounded in recoverable, review-safe conversation evidence. Generate Proposal may run on a weak case; Approve Regression cannot be recommended or persisted from catalog-only or empty evidence.  
