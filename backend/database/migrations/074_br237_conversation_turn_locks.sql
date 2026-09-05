@@ -115,6 +115,8 @@ COMMENT ON FUNCTION public.release_atlas_conversation_turn_lock(uuid, uuid, text
 
 REVOKE ALL ON FUNCTION public.acquire_atlas_conversation_turn_lock(uuid, uuid, text, integer, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.release_atlas_conversation_turn_lock(uuid, uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.acquire_atlas_conversation_turn_lock(uuid, uuid, text, integer, text) FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.release_atlas_conversation_turn_lock(uuid, uuid, text) FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.acquire_atlas_conversation_turn_lock(uuid, uuid, text, integer, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.release_atlas_conversation_turn_lock(uuid, uuid, text) TO service_role;
 
