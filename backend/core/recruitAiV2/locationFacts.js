@@ -741,6 +741,82 @@ function isFalsePositiveStateToken(token) {
   return ["me", "in", "or", "ok", "la", "ma", "pa", "id", "hi", "de", "al"].includes(t);
 }
 
+function tokenizeLocationWords(raw) {
+  return foldLocationToken(String(raw || "").replace(/,/g, " "))
+    .replace(/[?!¡¿.;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
+ * BR-232 — prefer a recognized trailing city + state over rejecting a
+ * street-address answer. Longest known city immediately before the state wins
+ * ("north miami beach" over "north miami" / "miami" / "beach").
+ */
+function extractTrailingKnownCityState(raw) {
+  const { text: withoutZip, zip } = extractTrailingUsZip(raw);
+  const tokens = tokenizeLocationWords(withoutZip);
+  if (tokens.length < 2) {
+    return null;
+  }
+
+  let state = null;
+  let cityEnd = tokens.length;
+  if (tokens.length >= 3) {
+    const twoWordState = normalizeStateToken(tokens.slice(-2).join(" "));
+    if (twoWordState) {
+      state = twoWordState;
+      cityEnd = tokens.length - 2;
+    }
+  }
+  if (!state) {
+    const last = tokens[tokens.length - 1];
+    if (isFalsePositiveStateToken(last)) {
+      return null;
+    }
+    state = normalizeStateToken(last);
+    if (!state) {
+      return null;
+    }
+    cityEnd = tokens.length - 1;
+  }
+
+  const beforeState = tokens.slice(0, cityEnd);
+  if (!beforeState.length) {
+    return null;
+  }
+
+  const maxWindow = Math.min(4, beforeState.length);
+  for (let size = maxWindow; size >= 1; size -= 1) {
+    const cityTokens = beforeState.slice(-size);
+    if (cityTokens.some((token) => /^\d/.test(token))) {
+      continue;
+    }
+    const key = resolveCanonicalCityKey(cityTokens.join(" "));
+    if (!key || !CANONICAL_CITY_KEYS.has(key)) {
+      continue;
+    }
+    const city = titleCaseCity(key);
+    if (!isPlausibleCityName(city)) {
+      continue;
+    }
+    return attachZip(
+      {
+        city,
+        state,
+        proposedState: null,
+        completeness: "complete",
+        requiresClarification: false
+      },
+      zip
+    );
+  }
+
+  return null;
+}
+
 function looksLikeConversationalProseCity(text) {
   const raw = String(text || "").trim();
   if (!raw) {
@@ -891,9 +967,6 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
-  if (looksLikeConversationalProseCity(source) || looksLikeConversationalProseCity(folded)) {
-    return null;
-  }
   if (
     looksLikeLanguageOrIdentitySelfDescription(source) ||
     looksLikeLanguageOrIdentitySelfDescription(folded)
@@ -959,6 +1032,16 @@ function parseLocationAnswerCore(raw) {
       schedNorm
     )
   ) {
+    return null;
+  }
+
+  // Implements BR-232 — recognized trailing city/state outranks street-number prose reject.
+  const trailingLocality = extractTrailingKnownCityState(source);
+  if (trailingLocality?.completeness === "complete") {
+    return attachZip(trailingLocality, stripped.zip);
+  }
+
+  if (looksLikeConversationalProseCity(source) || looksLikeConversationalProseCity(folded)) {
     return null;
   }
 
@@ -1164,6 +1247,7 @@ module.exports = {
   parseCityStatePhrase,
   extractTrailingUsZip,
   extractLocationCandidateText,
+  extractTrailingKnownCityState,
   normalizeCityLookupKey,
   isHighConfidenceFloridaCity,
   buildHighConfidenceFloridaLocation,
