@@ -3824,6 +3824,30 @@ Coverage is not a `reason`. Use `coverageResult`: `COVERAGE_LOCAL`, `COVERAGE_OU
 
 ---
 
+## BR-237 — Recruit V2 Concurrent-Turn Coherence + WhatsApp Business App HUMAN Seal
+
+**Implements:** One Recruit V2 decision pipeline per conversation; last-meter stale-send suppression when a newer inbound exists; native WhatsApp Business App echoes create a durable HUMAN seal that blocks automated Graph send.  
+**Domain:** Recruit AI v2 live WhatsApp runtime / conversation ownership  
+**Depends on:** BR-034, BR-135, BR-166, BR-167, BR-203  
+**Related:** BR-124 (handoff ack must not bypass a durable HUMAN seal), BR-168 (late recovery still last-meter checked)  
+**Status:** Implemented  
+**Engine target:** `recruitAiV2/conversationTurnLock.js`; `recruitAiV2/lastMeterOutboundGuard.js`; `globalConversationCoherenceGuard.js`; `communicationHub.js`; `whatsappOutboundPipeline.js`; `whatsappHumanOutboundPipeline.js`; `whatsappInboundPipeline.js`  
+**Tests:** `backend/test/recruitAiV2CoherenceHumanSealBr237.test.js`
+
+### Rules
+
+1. **Per-conversation serialization** — Live Recruit V2 inbound processing (including Return to Atlas resume) is serialized by `organizationId + prospectId`. Unrelated prospects and other orgs proceed concurrently. Do not serialize an organization globally.
+2. **Distributed lock** — Production uses a leased Postgres row (`atlas_conversation_turn_locks`) so multiple Railway instances cannot run two decision pipelines for the same conversation. Lease expiry prevents deadlock. Duplicate `provider_message_id` stays idempotent at the inbound claim.
+3. **Last-meter stale send** — Immediately before automated Graph send, compare the authored inbound (`provider_message_id`) to the latest durable prospect inbound marker. If a newer inbound exists, suppress. Do not mark the conversation failed. The newer turn may proceed.
+4. **BR-166 must not no-op** — Missing `contextVersion` is not permission to send. If a demonstrably newer inbound exists, fail closed (`COHERENCE_STALE_OUTBOUND`). A same-inbound version bump (`lastProcessedMessageId` equals the authored inbound) is not stale.
+5. **HUMAN hard seal** — When a native WhatsApp Business App echo is persisted for an existing prospect, write `workflowOwnership=AGENT`, `manualAgentOwnership=true`, `humanTakenOverAt=now`, `handoffReason=whatsapp_business_app` in the same persist path. Re-read ownership immediately before Graph send. If the seal is present, suppress. No `allowHandoffAck` / escalation exception bypasses an already-durable HUMAN seal.
+6. **Return to Atlas** — Explicit Return to Atlas still clears the seal; later automation may resume.
+7. **Human echo org correlation** — When organization is deterministically resolved from the WhatsApp asset, persist it on the echo `conversation_logs` row. Do not invent an org when resolution is ambiguous.
+8. **Observability** — `recruit_ai_v2.reply.suppressed_stale` and `recruit_ai_v2.reply.suppressed_human_owned`. No raw message body or PII.
+9. **Boundaries** — Do not change city parsing, coverage, scheduling, IUL unknown-carrier, campaign eligibility, or colloquial Spanish aliases.
+
+---
+
 ## BR-227 — AI Quality Evidence Integrity + Approval Safety
 
 **Implements:** AI Quality cases and learning proposals must be grounded in recoverable, review-safe conversation evidence. Generate Proposal may run on a weak case; Approve Regression cannot be recommended or persisted from catalog-only or empty evidence.  

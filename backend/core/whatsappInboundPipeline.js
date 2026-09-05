@@ -620,6 +620,26 @@ async function processInboundWhatsAppMessage(inbound, dependencies = {}) {
   });
 
   try {
+    const {
+      recordProspectInboundCoherenceMarker
+    } = require("./recruitAiV2/lastMeterOutboundGuard");
+    await recordProspectInboundCoherenceMarker({
+      phone: storagePhone,
+      organizationId: organizationId || prospect?.organization_id || claimedOrganizationId || null,
+      prospectId: prospect?.id || null,
+      providerMessageId: inbound.providerMessageId,
+      inboundAt: logResult.log?.created_at || new Date().toISOString()
+    });
+  } catch (markerError) {
+    logWhatsAppStage("recruit_ai_v2_inbound_coherence_marker_failed", {
+      level: "warn",
+      phone: storagePhone,
+      providerMessageId: inbound.providerMessageId,
+      error: markerError.message
+    });
+  }
+
+  try {
     const reactivate =
       dependencies.reactivateWindowExpiredConversation ||
       require("./conversationsCenter/conversationWindowInboxEngine")

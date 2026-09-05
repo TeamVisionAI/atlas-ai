@@ -55,6 +55,48 @@ test("BR-166 is tenant/user agnostic: non-v2 path is untouched", () => {
   assert.equal(result.reason, REASONS.NOT_V2);
 });
 
+test("same-inbound version bump is not stale", () => {
+  const result = evaluateAgainstLatestContext({
+    engineResult: v2EngineResult({ version: 9, question: "appointment_confirmed" }),
+    latestContext: latestContext({
+      version: 10,
+      messageId: "wamid-si",
+      question: "confirm_slot"
+    }),
+    currentInboundMessageId: "wamid-si"
+  });
+
+  assert.equal(result.allowed, true);
+  assert.equal(result.reason, REASONS.OK);
+});
+
+test("newer inbound suppresses even when contextVersion is null", () => {
+  const result = evaluateAgainstLatestContext({
+    engineResult: {
+      source: "recruit_ai_v2_live_authoring",
+      owner: "v2",
+      v2Result: {
+        nextContext: {
+          prospectId: "11111111-1111-4111-8111-111111111111",
+          knownFacts: {},
+          conversation: { lastQuestionAsked: "ask_state" }
+        },
+        responsePlan: { templateKey: "ask_state" }
+      }
+    },
+    latestContext: latestContext({
+      version: null,
+      messageId: "wamid-b",
+      facts: { city: "Dania Beach", state: "FL" }
+    }),
+    currentInboundMessageId: "wamid-a",
+    latestInboundProviderMessageId: "wamid-b"
+  });
+
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, REASONS.STALE_OUTBOUND);
+});
+
 test("newer durable context suppresses an older authored reply", () => {
   const result = evaluateAgainstLatestContext({
     engineResult: v2EngineResult({ version: 7, question: "ask_authorization" }),

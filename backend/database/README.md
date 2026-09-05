@@ -533,3 +533,14 @@ Creates `tiktok_live_engagements` with backend-only RLS (service role). No `pros
 
 Tests: `backend/test/tikfinityLiveEventBridge.test.js`
 
+## BR-237 — Conversation turn locks (migration 074)
+
+```
+backend/database/migrations/074_br237_conversation_turn_locks.sql
+backend/database/migrations/074_br237_conversation_turn_locks_down.sql
+```
+
+Creates `atlas_conversation_turn_locks` plus `acquire_atlas_conversation_turn_lock` / `release_atlas_conversation_turn_lock` RPCs (service role). Leased lock serializes one Recruit V2 decision pipeline per `organization_id` + `prospect_id` across Railway instances. Do not apply from this PR unless an operator explicitly authorizes the write.
+
+Tests: `backend/test/recruitAiV2CoherenceHumanSealBr237.test.js`
+

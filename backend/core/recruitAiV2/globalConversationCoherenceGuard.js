@@ -180,7 +180,8 @@ function resolveAuthoredQuestionKey(engineResult = {}) {
 function evaluateAgainstLatestContext({
   engineResult = {},
   latestContext = null,
-  currentInboundMessageId = null
+  currentInboundMessageId = null,
+  latestInboundProviderMessageId = null
 } = {}) {
   if (!isV2Owned(engineResult)) {
     return { allowed: true, reason: REASONS.NOT_V2 };
@@ -196,37 +197,43 @@ function evaluateAgainstLatestContext({
       v2.persistence?.result?.contextVersion
   );
   const latestVersion = toVersion(latestContext?._persistence?.contextVersion);
-  const latestProcessed = latestContext?._persistence?.lastProcessedMessageId || null;
+  const latestProcessed =
+    latestInboundProviderMessageId ||
+    latestContext?._persistence?.lastProcessedMessageId ||
+    null;
+  const authoredInboundId = String(currentInboundMessageId || "").trim();
+  const latestInboundId = String(latestProcessed || "").trim();
+  const sameInbound =
+    Boolean(authoredInboundId) &&
+    Boolean(latestInboundId) &&
+    authoredInboundId === latestInboundId;
 
-  // A later inbound has already advanced the durable row. Never let this older
-  // turn speak after the newer state won.
-  if (
-    authoredVersion != null &&
-    latestVersion != null &&
-    latestVersion > authoredVersion
-  ) {
+  // Implements BR-237 — a newer inbound is stale even when contextVersion is null.
+  if (authoredInboundId && latestInboundId && !sameInbound) {
     return {
       allowed: false,
       reason: REASONS.STALE_OUTBOUND,
       authoredVersion,
       latestVersion,
-      latestProcessedMessageId: latestProcessed
+      latestProcessedMessageId: latestInboundId,
+      authoredInboundProviderMessageId: authoredInboundId
     };
   }
 
-  // Defensive message-id check for stores where version metadata is unavailable.
+  // A later inbound has already advanced the durable row. Same-inbound
+  // version bumps (this turn's persist) are not stale.
   if (
-    currentInboundMessageId &&
-    latestProcessed &&
-    authoredVersion == null &&
-    latestProcessed !== currentInboundMessageId
+    authoredVersion != null &&
+    latestVersion != null &&
+    latestVersion > authoredVersion &&
+    !sameInbound
   ) {
     return {
       allowed: false,
       reason: REASONS.STALE_OUTBOUND,
       authoredVersion,
       latestVersion,
-      latestProcessedMessageId: latestProcessed
+      latestProcessedMessageId: latestInboundId || null
     };
   }
 
@@ -296,10 +303,24 @@ async function guardOutboundConversationCoherence({
       ensureCore: false
     });
 
+    let latestInboundProviderMessageId = null;
+    try {
+      const { loadPersistedWorkflowState } = require("../workflowStateStore");
+      const workflow = await loadPersistedWorkflowState(prospect.phone || normalized.phone, {
+        organizationId,
+        prospectId
+      });
+      latestInboundProviderMessageId =
+        workflow?.lastProspectInboundProviderMessageId || null;
+    } catch {
+      latestInboundProviderMessageId = null;
+    }
+
     return evaluateAgainstLatestContext({
       engineResult,
       latestContext,
-      currentInboundMessageId: normalized.providerMessageId || null
+      currentInboundMessageId: normalized.providerMessageId || null,
+      latestInboundProviderMessageId
     });
   } catch (error) {
     return {
