@@ -3792,6 +3792,38 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-236 — Recruit location observability is separate from coverage
+
+**Implements:** When Recruit V2 actually resolves or clarifies a location, emit one structured `recruit_ai_v2.location.resolution` event. Resolver outcome (BR-233 / BR-235) and tenant coverage (BR-226) are separate fields. This is measurement only.  
+**Domain:** Recruit AI v2 / observability  
+**Depends on:** BR-233, BR-235, BR-226  
+**Related:** BR-082, BR-217  
+**Status:** Implemented — telemetry only; **no customer-visible change**  
+**Engine target:** `locationResolutionObservability.emitLocationResolutionFromDecision`; `stage1Observability.emitRecruitAiV2Signal`  
+**Tests:** `backend/test/recruitAiV2LocationResolutionObservabilityBr236.test.js`
+
+### Rules
+
+1. **One event, two dimensions** — `reason` / `resolutionSource` describe how the pair was parsed. `coverageResult` is `COVERAGE_LOCAL`, `COVERAGE_OUTSIDE`, or null. Do not treat OUTSIDE as a resolver miss.
+2. **Emit only when location is used** — `provide_location` / `correct_location`. Do not emit for FAQ, work-auth, scheduling, or IUL turns where the location parser is skipped or unused.
+3. **Privacy** — Do not log raw message body, street address, phone, email, name, or full ZIP. City, state, and `zipPresent` are allowed. Unresolved phrase keys are folded city tokens without digits.
+4. **No new store** — Events use existing `logWhatsAppStage` / `recruit_ai_v2.*` envelopes. No dashboard, no admin UI, no new table.
+5. **Fail-soft** — Observability must never throw into the decision engine or change replies, coverage, or IUL.
+
+### Event
+
+`recruit_ai_v2.location.resolution` via existing `emitRecruitAiV2Signal` / `logWhatsAppStage`. No migration.
+
+Fields: `organizationId`, `prospectId`, `conversationId`, `resolutionSource`, `confidence`, `completeness`, `requiresClarification`, `city`, `state`, `zipPresent`, `zipValidated`, `nationalResolverMatched`, `fallbackUsed`, `coverageResult`, `parserPath`, `reason`, `unresolvedPhraseKey`.
+
+### Resolution outcomes (`reason`)
+
+`GAZETTEER_COMPLETE`, `ZIP_VALIDATED_COMPLETE`, `ZIP_CONFLICT_CLARIFY`, `AMBIGUOUS_CITY_CLARIFY`, `FL_OVERLAY_COMPLETE`, `CATALOG_ALIAS_COMPLETE`, `LEGACY_HEURISTIC_COMPLETE`, `NATIONAL_RESOLVER_NO_MATCH`, `NON_US_OR_UNKNOWN`, `SEMANTIC_GUARD_SKIPPED`, `PARTIAL_LOCATION`, `STATE_ONLY`.
+
+Coverage is not a `reason`. Use `coverageResult`: `COVERAGE_LOCAL`, `COVERAGE_OUTSIDE`, or null.
+
+---
+
 ## BR-227 — AI Quality Evidence Integrity + Approval Safety
 
 **Implements:** AI Quality cases and learning proposals must be grounded in recoverable, review-safe conversation evidence. Generate Proposal may run on a weak case; Approve Regression cannot be recommended or persisted from catalog-only or empty evidence.  

@@ -33,7 +33,8 @@ const EVENTS = Object.freeze({
   EXECUTION_AUTHZ_DENIED: "recruit_ai_v2.execution.authz_denied",
   EXECUTION_GATE_DISABLED: "recruit_ai_v2.execution.gate_disabled",
   EXECUTION_UNSUPPORTED_MUTATION: "recruit_ai_v2.execution.unsupported_mutation",
-  REPLY_DELIVERED: "recruit_ai_v2.reply.delivered"
+  REPLY_DELIVERED: "recruit_ai_v2.reply.delivered",
+  LOCATION_RESOLUTION: "recruit_ai_v2.location.resolution"
 });
 
 const ENVELOPE_KEYS = new Set([
