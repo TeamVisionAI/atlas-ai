@@ -34,6 +34,8 @@ const EVENTS = Object.freeze({
   EXECUTION_GATE_DISABLED: "recruit_ai_v2.execution.gate_disabled",
   EXECUTION_UNSUPPORTED_MUTATION: "recruit_ai_v2.execution.unsupported_mutation",
   REPLY_DELIVERED: "recruit_ai_v2.reply.delivered",
+  REPLY_SUPPRESSED_STALE: "recruit_ai_v2.reply.suppressed_stale",
+  REPLY_SUPPRESSED_HUMAN_OWNED: "recruit_ai_v2.reply.suppressed_human_owned",
   LOCATION_RESOLUTION: "recruit_ai_v2.location.resolution"
 });
 
@@ -61,7 +63,14 @@ const ENVELOPE_KEYS = new Set([
   "reconciled",
   "allowExecution",
   "outboundIntent",
-  "deliverySuccess"
+  "deliverySuccess",
+  "authoredInboundProviderMessageId",
+  "latestInboundProviderMessageId",
+  "authoredVersion",
+  "latestVersion",
+  "ownershipState",
+  "humanTakenOverAt",
+  "handoffReason"
 ]);
 
 function asReasonCodes(fields = {}) {
@@ -122,6 +131,17 @@ function buildEnvelope(fields = {}) {
     outboundIntent: fields.outboundIntent ?? null,
     deliverySuccess:
       fields.deliverySuccess == null ? null : Boolean(fields.deliverySuccess),
+    providerMessageId: fields.providerMessageId ?? null,
+    authoredInboundProviderMessageId:
+      fields.authoredInboundProviderMessageId ?? null,
+    latestInboundProviderMessageId:
+      fields.latestInboundProviderMessageId ?? null,
+    authoredVersion:
+      fields.authoredVersion == null ? null : fields.authoredVersion,
+    latestVersion: fields.latestVersion == null ? null : fields.latestVersion,
+    ownershipState: fields.ownershipState ?? null,
+    humanTakenOverAt: fields.humanTakenOverAt ?? null,
+    handoffReason: fields.handoffReason ?? null,
     ...extras
   };
 }

@@ -222,7 +222,7 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
     language: contactOnly ? null : resolveProspectCommunicationCode(prospect),
     city: contactOnly ? null : prospect.city || null,
     state: contactOnly ? null : prospect.state || null,
-    ...(contactOnly ? { organizationId } : {}),
+    organizationId,
     actorOverride: echoActor.actor,
     eventCorrelationId: correlationId,
     providerMessageId,
@@ -243,6 +243,18 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
       correlationId,
       contactOnly
     };
+  }
+
+  // Implements BR-237 — seal HUMAN ownership immediately after echo persist,
+  // before delivery bookkeeping, so last-meter can see the seal.
+  let ownership = null;
+  if (!contactOnly) {
+    ownership = await sealHumanOwnership(prospect.phone, {
+      organizationId,
+      prospectId: prospect.id || null,
+      prospect,
+      reason: HANDOFF_REASONS.WHATSAPP_BUSINESS_APP
+    });
   }
 
   const recordDelivery =
@@ -269,16 +281,6 @@ async function processHumanWhatsAppOutboundEcho(echo, dependencies = {}) {
       error: deliveryError.message
     });
   });
-
-  let ownership = null;
-  if (!contactOnly) {
-    ownership = await sealHumanOwnership(prospect.phone, {
-      organizationId,
-      prospectId: prospect.id || null,
-      prospect,
-      reason: HANDOFF_REASONS.WHATSAPP_BUSINESS_APP
-    });
-  }
 
   logWhatsAppStage("human_echo_persisted", {
     providerMessageId,

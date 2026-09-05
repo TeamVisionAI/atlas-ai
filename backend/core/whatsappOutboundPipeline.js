@@ -42,6 +42,9 @@ const {
   isManualOutboundActor,
   emitAutomatedOutboundSuppression
 } = require("./automationOutboundEligibility");
+const {
+  guardLastMeterAutomatedOutbound
+} = require("./recruitAiV2/lastMeterOutboundGuard");
 
 function buildOutboundCorrelationId(providerMessageId) {
   return `${WHATSAPP_CORRELATION_PREFIX.OUTBOUND}${providerMessageId}`;
@@ -299,7 +302,8 @@ async function sendAndPersistWhatsAppMessage({
   inboundPhoneNumberId = null,
   inboundEvent = null,
   handlerPath = null,
-  prospectOverride = null
+  prospectOverride = null,
+  engineResult = null
 } = {}) {
   if (!to) {
     return {
@@ -440,6 +444,47 @@ async function sendAndPersistWhatsAppMessage({
     mode === "freeform"
       ? String(authorization.message || message || "").trim()
       : `[template:${authorization.metaTemplateName}]`;
+
+  // Implements BR-237 — last-meter check immediately before Graph / mock send.
+  if (!isManualOutboundActor(actor)) {
+    const lastMeter = await guardLastMeterAutomatedOutbound({
+      actor,
+      prospect: prospectRecord || prospect,
+      normalized: inboundEvent || {},
+      engineResult: engineResult || {},
+      organizationId: resolvedOrgId,
+      inboundEvent
+    });
+    if (!lastMeter.allowed) {
+      const blockedAuth = {
+        status: DELIVERY_STATUSES.BLOCKED_NOT_ELIGIBLE,
+        reason: lastMeter.reason,
+        retryable: false,
+        permittedDeliveryMode: null
+      };
+      await persistBlockedOrFailedAttempt({
+        prospect: prospectRecord,
+        storagePhone,
+        organizationId: resolvedOrgId,
+        intent,
+        actor,
+        authorization: blockedAuth,
+        status: blockedAuth.status,
+        idempotencyKey
+      });
+      return {
+        success: false,
+        status: blockedAuth.status,
+        error: lastMeter.reason,
+        retryable: false,
+        reason: lastMeter.reason,
+        delivery: blockedAuth,
+        providerMessageId: null,
+        conversationLogId: null,
+        lastMeter
+      };
+    }
+  }
 
   const providerMessageIdSeed = crypto.randomUUID();
   let sendResult = {
@@ -619,6 +664,15 @@ async function sendAndPersistWhatsAppMessage({
     window: authorization.window,
     category: authorization.category || null,
     version: authorization.version || null,
+    contextVersion:
+      engineResult?.v2Result?.nextContext?._persistence?.contextVersion ??
+      engineResult?.v2Result?.persistence?.result?.contextVersion ??
+      engineResult?.contextVersion ??
+      null,
+    authoredInboundProviderMessageId:
+      engineResult?.authoredInboundProviderMessageId ||
+      inboundEvent?.providerMessageId ||
+      null,
     languageCode: authorization.languageCode || null,
     sanitized: true,
     credentialSource: sendResult.credentialSource || null,

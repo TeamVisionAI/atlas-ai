@@ -18,6 +18,10 @@ const { logWhatsAppStage } = require("./whatsappStructuredLogger");
 const liveAuthoringBridge = require("./recruitAiV2/liveAuthoringBridge");
 const conversationCoherenceGuard = require("./recruitAiV2/globalConversationCoherenceGuard");
 const {
+  guardLastMeterAutomatedOutbound
+} = require("./recruitAiV2/lastMeterOutboundGuard");
+const { withConversationTurnLock } = require("./recruitAiV2/conversationTurnLock");
+const {
   evaluateAtlasInboundAutomationEligibility,
   resolveAtlasInboundAutomationEligibility
 } = require("./atlasInboundAutomationEligibility");
@@ -112,9 +116,13 @@ async function shouldDeliverAutomatedReply(prospect, options = {}) {
   const needsAttention = Boolean(persisted.needsHumanAttention);
 
   if (humanOwned || needsAttention) {
-    if (options.allowHandoffAck === true) {
+    if (
+      options.allowHandoffAck === true &&
+      persisted.manualAgentOwnership !== true &&
+      !persisted.humanTakenOverAt
+    ) {
       // Implements BR-124 — customer-facing handoff/recovery ack may still deliver
-      // for stall/escalate without an active TAKE OVER seal.
+      // for stall/escalate without an active TAKE OVER / Business App seal.
       return true;
     }
     return false;
@@ -256,6 +264,48 @@ async function deliverWhatsAppReply({
     };
   }
 
+  // Implements BR-237 — last-meter HUMAN / newer-inbound check before transport.
+  const lastMeter = await guardLastMeterAutomatedOutbound({
+    actor: "ATLAS",
+    prospect,
+    normalized,
+    engineResult: {
+      ...engineResult,
+      authoredInboundProviderMessageId:
+        engineResult?.authoredInboundProviderMessageId ||
+        normalized.providerMessageId ||
+        null
+    },
+    organizationId: prospect?.organization_id || prospect?.organizationId || null
+  });
+  if (!lastMeter.allowed) {
+    logWhatsAppStage(
+      lastMeter.reason === "HUMAN_OWNED"
+        ? "automated_reply_suppressed_human_owned"
+        : "automated_reply_suppressed_conversation_coherence",
+      {
+        phone: normalized.phone,
+        organizationId: prospect?.organization_id || prospect?.organizationId || null,
+        prospectId:
+          engineResult?.v2Result?.nextContext?.prospectId ||
+          prospect?.id ||
+          null,
+        providerMessageId: normalized.providerMessageId || null,
+        reason: lastMeter.reason,
+        authoredVersion: lastMeter.authoredVersion ?? null,
+        latestVersion: lastMeter.latestVersion ?? null
+      }
+    );
+    return {
+      success: true,
+      replied: false,
+      reason: lastMeter.reason,
+      replyText,
+      engineResult,
+      lastMeter
+    };
+  }
+
   let templateKey = null;
   let templateVariables = {};
 
@@ -301,7 +351,14 @@ async function deliverWhatsAppReply({
       interactiveFallbackText: replyEntities.interactiveFallbackText || outboundText,
       inboundEvent: normalized,
       handlerPath: "communicationHub.deliverWhatsAppReply",
-      prospectOverride: prospect
+      prospectOverride: prospect,
+      engineResult: {
+        ...engineResult,
+        authoredInboundProviderMessageId:
+          engineResult?.authoredInboundProviderMessageId ||
+          normalized.providerMessageId ||
+          null
+      }
   });
 
   const isV2Owned =
@@ -382,7 +439,7 @@ async function deliverWhatsAppReply({
   };
 }
 
-async function processNormalizedInboundMessage(
+async function processNormalizedInboundMessageUnlocked(
   normalized,
   {
     prospect,
@@ -736,6 +793,20 @@ async function processNormalizedInboundMessage(
   };
 }
 
+async function processNormalizedInboundMessage(normalized, options = {}) {
+  const prospect = options.prospect || {};
+  return withConversationTurnLock(
+    {
+      organizationId: prospect.organization_id || prospect.organizationId || null,
+      prospectId: prospect.id || null,
+      providerMessageId: normalized?.providerMessageId || null,
+      env: options.env || process.env,
+      dependencies: options.authoringDependencies || {}
+    },
+    () => processNormalizedInboundMessageUnlocked(normalized, options)
+  );
+}
+
 /**
  * Production entry: WhatsApp inbound already persisted by whatsappInboundPipeline.
  */
@@ -760,6 +831,7 @@ module.exports = {
   computeAllowHandoffAck,
   deliverWhatsAppReply,
   processNormalizedInboundMessage,
+  processNormalizedInboundMessageUnlocked,
   processConversationAfterInbound,
   extractReplyText,
   resolveWhatsAppReplyEntities,

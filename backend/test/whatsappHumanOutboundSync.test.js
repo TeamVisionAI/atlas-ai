@@ -211,6 +211,7 @@ test("4. native WhatsApp Business human outbound persists one Human message", as
   assert.equal(logs[0].direction, "outgoing");
   assert.equal(logs[0].actorOverride, "AGENT");
   assert.equal(logs[0].message, "Hola, soy Christell");
+  assert.equal(logs[0].organizationId, ORG_A);
 });
 
 test("5. human outbound switches ownership ATLAS → HUMAN (sticky seal)", async () => {

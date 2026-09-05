@@ -60,7 +60,9 @@ const DURABLE_RUNTIME_FIELDS = Object.freeze([
   "atlasEligibilitySource",
   "ctwaReferral",
   "ctwa_clid",
-  "ctwaEvidencePersistedAt"
+  "ctwaEvidencePersistedAt",
+  "lastProspectInboundProviderMessageId",
+  "lastProspectInboundAt"
 ]);
 
 /** In-memory backend for tests / restart simulation. */
@@ -126,7 +128,9 @@ function defaultWorkflowRecord() {
     atlasEligibilitySource: null,
     ctwaReferral: null,
     ctwa_clid: null,
-    ctwaEvidencePersistedAt: null
+    ctwaEvidencePersistedAt: null,
+    lastProspectInboundProviderMessageId: null,
+    lastProspectInboundAt: null
   };
 }
 
