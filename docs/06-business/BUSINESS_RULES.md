@@ -3734,9 +3734,9 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 **Domain:** Recruit AI / qualification location (foundation)  
 **Depends on:** BR-082, BR-094, BR-217  
 **Related:** BR-226 (coverage after resolution); BR-232 (street + trailing locality); PR #371  
-**Status:** Data + resolver module only — **not wired into Recruit V2 live path**; **execution remains OFF**  
+**Status:** Data + resolver module implemented; Recruit V2 consumption is BR-235  
 **Engine target:** `backend/core/usLocalityResolver`  
-**Tests:** `backend/test/usLocalityResolverBr233.test.js`
+**Tests:** `backend/test/usLocalityResolverBr233.test.js`; `backend/test/recruitAiV2NationalLocalityResolverBr235.test.js`
 
 ### Rules
 
@@ -3768,6 +3768,27 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 4. **Dedupe** — One review per `provider_message_id`. Missing provider id fails closed.
 5. **Fail-closed** — Do not create a prospect, promote CONTACT, start Recruit V2, send Atlas WhatsApp, enable BR-193, treat 131060 as CTWA, or infer campaign. Personal / unknown inbound stays out of this queue. Non-131060 unsupported contact-only stays unchanged.
 6. **Tenant isolation** — Reviews are scoped by `organization_id`.
+
+---
+
+## BR-235 — Recruit V2 resolves U.S. location nationally before tenant coverage
+
+**Implements:** Recruit V2 location parsing uses the BR-233 national Census resolver to identify a U.S. city/state, then existing BR-226 `evaluateCoverage` / `localCities` classifies LOCAL vs OUTSIDE. Tenant coverage lists are not the parser dictionary.  
+**Domain:** Recruit AI v2 / qualification location  
+**Depends on:** BR-233, BR-226, BR-082, BR-094, BR-217, BR-232  
+**Related:** BR-155, BR-173, BR-187  
+**Status:** Implemented in code; **IUL unchanged**; **no new production flag**  
+**Engine target:** `locationFacts.tryNationalUsLocalityResolution`; `parseLocationAnswerCore`  
+**Tests:** `backend/test/recruitAiV2NationalLocalityResolverBr235.test.js`
+
+### Rules
+
+1. **Resolution first** — After existing semantic guards, accept a BR-233 complete gazetteer or ZIP-validated pair even when the city is absent from `CITY_TO_PROPOSED_STATE` / `CANONICAL_CITY_KEYS` / `localCities`.
+2. **Coverage second** — Do not change `evaluateCoverage`. Dallas, TX is a valid national pair and Team Vision OUTSIDE. North Miami Beach, FL is LOCAL for Team Vision.
+3. **Preserve overlays** — City-only Florida high-confidence completion (#371 Orlando) stays on the existing catalog overlay. Do not let a national unique-city proposal skip that path.
+4. **Street + ZIP** — Trailing longest locality wins. Street numbers/names are never the city. ZIP mismatch clarifies; do not guess. ZIP alone is not a location (BR-217).
+5. **Fail-closed** — FAQ, work-auth, scheduling, identity, and non-U.S. phrases still fail the existing guards. Invented city + state may remain a low-confidence heuristic; it is not gazetteer-high.
+6. **Boundaries** — Do not copy the national dataset into `locationFacts`. Do not expand Levenshtein nationally. Do not change IUL.
 
 ---
 

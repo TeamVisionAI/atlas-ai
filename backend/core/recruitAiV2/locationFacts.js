@@ -1,13 +1,19 @@
 /**
- * Recruit AI v2 — location facts (BR-082 / BR-094 / BR-173).
+ * Recruit AI v2 — location facts (BR-082 / BR-094 / BR-173 / BR-235).
  * City-only answers are partial. City + recognized state abbrev/name → confirmed.
  * Implements BR-094 — U.S. postal abbreviation / informal city-state normalization.
  * Implements BR-173 — Spanish/English state aliases, safe city-typo canonicalization,
  * and order-independent merge of city-then-state or state-then-city.
+ * Implements BR-235 — national U.S. resolution (BR-233) before tenant coverage (BR-226).
  * Uses BR-095 inbound normalization for case/punctuation/whitespace tolerance.
  */
 
 const { prepareLocationSearchText } = require("./inputNormalization");
+const {
+  resolveUsLocality,
+  COMPLETENESS: NATIONAL_COMPLETENESS,
+  RESOLUTION_SOURCE
+} = require("../usLocalityResolver");
 
 const FACT_CERTAINTY = Object.freeze({
   CONFIRMED: "confirmed",
@@ -755,6 +761,132 @@ function tokenizeLocationWords(raw) {
  * street-address answer. Longest known city immediately before the state wins
  * ("north miami beach" over "north miami" / "miami" / "beach").
  */
+const FALSE_POSITIVE_USPS_TO_NAME = Object.freeze({
+  al: "Alabama",
+  de: "Delaware",
+  hi: "Hawaii",
+  id: "Idaho",
+  in: "Indiana",
+  la: "Louisiana",
+  ma: "Massachusetts",
+  me: "Maine",
+  ok: "Oklahoma",
+  or: "Oregon",
+  pa: "Pennsylvania"
+});
+
+function rewriteNewYorkCityAlias(source) {
+  const folded = foldLocationToken(source);
+  if (!folded) {
+    return source;
+  }
+  if (folded === "new york city") {
+    return "New York";
+  }
+  const trailing = folded.match(/^(.*)new york city(?:\s+(ny|new york|nueva york))?$/);
+  if (!trailing) {
+    return source;
+  }
+  const prefix = String(trailing[1] || "").trim();
+  const state = trailing[2] ? "NY" : "";
+  return [prefix, "New York", state].filter(Boolean).join(" ");
+}
+
+function expandTrailingFalsePositiveState(source) {
+  const tokens = String(source || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (tokens.length < 2) {
+    return source;
+  }
+  const last = tokens[tokens.length - 1].replace(/[.,]+$/g, "");
+  const name = FALSE_POSITIVE_USPS_TO_NAME[foldLocationToken(last)];
+  if (!name) {
+    return source;
+  }
+  const previous = tokens[tokens.length - 2];
+  if (!previous || /^\d/.test(previous)) {
+    return source;
+  }
+  return [...tokens.slice(0, -1), name].join(" ");
+}
+
+function mapNationalResolution(resolved, zip) {
+  if (!resolved || resolved.resolutionSource === RESOLUTION_SOURCE.NONE) {
+    return null;
+  }
+
+  if (resolved.matchSpan?.zipConflict && resolved.city) {
+    return attachZip(
+      {
+        city: resolved.city,
+        state: null,
+        proposedState: resolved.state || null,
+        completeness: "partial",
+        requiresClarification: true,
+        resolutionSource: resolved.resolutionSource,
+        confidence: resolved.confidence || null
+      },
+      zip || resolved.zip || null
+    );
+  }
+
+  if (
+    resolved.completeness === NATIONAL_COMPLETENESS.COMPLETE &&
+    resolved.city &&
+    resolved.state
+  ) {
+    return attachZip(
+      {
+        city: resolved.city,
+        state: resolved.state,
+        proposedState: null,
+        completeness: "complete",
+        requiresClarification: false,
+        resolutionSource: resolved.resolutionSource,
+        confidence: resolved.confidence || null
+      },
+      zip || resolved.zip || null
+    );
+  }
+
+  return null;
+}
+
+/**
+ * BR-235 — accept only complete / ZIP-conflict national hits.
+ * City-only gazetteer proposals stay on the existing FL overlay + catalog path.
+ */
+function tryNationalUsLocalityResolution(source, zip) {
+  const expanded = expandTrailingFalsePositiveState(source);
+  const candidates = [
+    source,
+    expanded,
+    rewriteNewYorkCityAlias(source),
+    rewriteNewYorkCityAlias(expanded)
+  ];
+  const seen = new Set();
+  for (const candidate of candidates) {
+    const input = zip ? `${candidate} ${zip}` : candidate;
+    if (seen.has(input)) {
+      continue;
+    }
+    seen.add(input);
+    let resolved;
+    try {
+      resolved = resolveUsLocality(input);
+    } catch {
+      continue;
+    }
+    const mapped = mapNationalResolution(resolved, zip);
+    if (mapped) {
+      return mapped;
+    }
+  }
+  return null;
+}
+
 function extractTrailingKnownCityState(raw) {
   const { text: withoutZip, zip } = extractTrailingUsZip(raw);
   const tokens = tokenizeLocationWords(withoutZip);
@@ -1035,6 +1167,13 @@ function parseLocationAnswerCore(raw) {
     return null;
   }
 
+  // Implements BR-235 — national gazetteer/ZIP resolution before catalog fallback.
+  // Semantic guards above stay fail-closed. City-only FL overlay is not replaced.
+  const national = tryNationalUsLocalityResolution(source, stripped.zip);
+  if (national) {
+    return national;
+  }
+
   // Implements BR-232 — recognized trailing city/state outranks street-number prose reject.
   const trailingLocality = extractTrailingKnownCityState(source);
   if (trailingLocality?.completeness === "complete") {
@@ -1248,6 +1387,7 @@ module.exports = {
   extractTrailingUsZip,
   extractLocationCandidateText,
   extractTrailingKnownCityState,
+  tryNationalUsLocalityResolution,
   normalizeCityLookupKey,
   isHighConfidenceFloridaCity,
   buildHighConfidenceFloridaLocation,
