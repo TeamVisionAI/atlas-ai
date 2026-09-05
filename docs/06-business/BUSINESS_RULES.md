@@ -3728,6 +3728,28 @@ Perssy production V2 context was reconstructed under orphan `prospect_id` `ad96b
 
 ---
 
+## BR-233 — National U.S. location resolution is tenant-agnostic
+
+**Implements:** Identify a U.S. city/state (50 states + DC) from inbound text using a bundled Census Places/CDP index. Tenant coverage is a later step (BR-226) and must not be the parser dictionary.  
+**Domain:** Recruit AI / qualification location (foundation)  
+**Depends on:** BR-082, BR-094, BR-217  
+**Related:** BR-226 (coverage after resolution); BR-232 (street + trailing locality); PR #371  
+**Status:** Data + resolver module only — **not wired into Recruit V2 live path**; **execution remains OFF**  
+**Engine target:** `backend/core/usLocalityResolver`  
+**Tests:** `backend/test/usLocalityResolverBr233.test.js`
+
+### Rules
+
+1. **Resolution first** — Atlas may resolve `Dallas, TX` or `North Miami Beach, FL` whether or not the tenant recruits there.
+2. **Coverage second** — `evaluateCoverage` / `localCities` (BR-226) classify LOCAL vs OUTSIDE only after a location fact exists. Do not use `localCities` as the national gazetteer.
+3. **Offline authoritative data** — Bundled Census Gazetteer Places + CDPs and a compact ZCTA–Place ZIP table. Public domain. No Google, Census HTTP, Supabase, or LLM on the resolver hot path.
+4. **Longest match** — Prefer `North Miami Beach` over `North Miami` / `Miami` / `Beach`. Street numbers and ZIP are never the city.
+5. **Ambiguity** — Bare names that exist in multiple states (`Springfield`) require clarification. Do not guess a state. ZIP or an explicit state may complete the pair.
+6. **Puerto Rico / territories** — Not part of this 50-state + DC recruiting resolver. Do not treat `PR` / `Puerto Rico` as a resolver state.
+7. **Boundaries** — PR 1 does not change interpreter, decisionEngine, WhatsApp, IUL, or BR-226. Florida high-confidence overlays stay a later Recruit V2 concern, not this dictionary.
+
+---
+
 ## BR-227 — AI Quality Evidence Integrity + Approval Safety
 
 **Implements:** AI Quality cases and learning proposals must be grounded in recoverable, review-safe conversation evidence. Generate Proposal may run on a weak case; Approve Regression cannot be recommended or persisted from catalog-only or empty evidence.  

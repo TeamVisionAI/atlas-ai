@@ -17,5 +17,8 @@ backend/data/agentActionState.json
 backend/data/workflowState.json
 .staging-*/
 
+# BR-233 Census ingest cache (generated index is committed)
+backend/core/usLocalityResolver/ingest/.cache/
+
 # Local HTTPS certificates (mkcert)
 frontend/.certs/
