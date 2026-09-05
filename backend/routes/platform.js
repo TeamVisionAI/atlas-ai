@@ -13,6 +13,7 @@ const {
 
 const platformBillingRoutes = require("./platformBilling");
 const platformAiQualityRoutes = require("./platformAiQuality");
+const { resetCanaryProspect } = require("../core/canaryResetService");
 
 const router = express.Router();
 
@@ -302,5 +303,23 @@ router.get("/whatsapp-inbound-webhooks", async (req, res) => {
 });
 
 router.use("/ai-quality", platformAiQualityRoutes);
+
+router.post("/canary-reset", async (req, res) => {
+  try {
+    const result = await resetCanaryProspect({
+      authContext: req.authContext,
+      organizationId: req.body?.organizationId,
+      prospectId: req.body?.prospectId,
+      resetReason: req.body?.resetReason,
+      resetMode: req.body?.resetMode
+    });
+    res.json({ result });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      error: error.publicCode || error.message,
+      message: error.message || "Unable to reset canary prospect."
+    });
+  }
+});
 
 module.exports = router;

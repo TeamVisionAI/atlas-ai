@@ -62,7 +62,12 @@ const DURABLE_RUNTIME_FIELDS = Object.freeze([
   "ctwa_clid",
   "ctwaEvidencePersistedAt",
   "lastProspectInboundProviderMessageId",
-  "lastProspectInboundAt"
+  "lastProspectInboundAt",
+  "canaryResetAt",
+  "canaryAwaitingFreshIntake",
+  "canaryResetReason",
+  "canaryResetMode",
+  "canaryResetActorUserId"
 ]);
 
 /** In-memory backend for tests / restart simulation. */
@@ -130,7 +135,12 @@ function defaultWorkflowRecord() {
     ctwa_clid: null,
     ctwaEvidencePersistedAt: null,
     lastProspectInboundProviderMessageId: null,
-    lastProspectInboundAt: null
+    lastProspectInboundAt: null,
+    canaryResetAt: null,
+    canaryAwaitingFreshIntake: false,
+    canaryResetReason: null,
+    canaryResetMode: null,
+    canaryResetActorUserId: null
   };
 }
 

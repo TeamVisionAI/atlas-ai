@@ -569,6 +569,12 @@ function evaluateAtlasInboundAutomationEligibility({
     return { eligible: true, reason: "CAMPAIGN_INTAKE_IUL" };
   }
 
+  // Implements BR-240 — canary reset must not reuse stored origin / continuation.
+  // Fresh CTWA / QR / campaign intake on this inbound already returned above.
+  if (workflowState?.canaryAwaitingFreshIntake === true) {
+    return { eligible: false, reason: "CANARY_RESET_AWAITING_FRESH_INTAKE" };
+  }
+
   // BR-165A — personal connection alone is not consent/eligibility.
   // Legitimate personal-number leads continue below only if they previously earned
   // a verified CTWA/QR/intake source or automation was explicitly enabled.
@@ -669,6 +675,9 @@ async function persistVerifiedAtlasEligibilitySource(phone, source, options = {}
   }
 
   const patch = { atlasEligibilitySource: nextSource };
+  if (existingState?.canaryAwaitingFreshIntake === true) {
+    patch.canaryAwaitingFreshIntake = false;
+  }
   const incomingEvidence = buildDurableCtwaEvidence(options.ctwaReferral);
   if (
     incomingEvidence &&
