@@ -1586,6 +1586,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       entities.completeness = "complete";
       entities.requiresClarification = false;
       entities.correction = isCorrection;
+      if (location.resolutionSource) {
+        entities.resolutionSource = location.resolutionSource;
+        entities.resolutionConfidence = location.confidence || null;
+      }
     } else if (location?.completeness === "partial") {
       // Correction of city while state already confirmed + geographically compatible.
       const priorState = context?.knownFacts?.state || null;
@@ -1622,6 +1626,10 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
         entities.completeness = "partial";
         entities.requiresClarification = true;
         entities.correction = isCorrection;
+        if (location.resolutionSource) {
+          entities.resolutionSource = location.resolutionSource;
+          entities.resolutionConfidence = location.confidence || null;
+        }
       }
     } else if (
       looksLikeName(text) &&
