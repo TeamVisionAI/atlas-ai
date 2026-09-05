@@ -1,7 +1,7 @@
 /**
  * Recruit AI v2 — business decision engine.
  * Produces auditable StructuredDecision JSON. Never executes side effects.
- * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116 / BR-119 / BR-164 / BR-231.
+ * Implements BR-081 / BR-082 / BR-083 / BR-084 / BR-085 / BR-086 / BR-087 / BR-088 / BR-089 / BR-090 / BR-115 / BR-116 / BR-119 / BR-164 / BR-231 / BR-239.
  */
 
 const { formatDateLabel } = require("./dateResolution");
@@ -46,6 +46,7 @@ const {
   resolveUniqueOfferedDaySelection,
   isOfferedSetAlreadySameDay,
   filterOfferedSlotsByDayPart,
+  isActiveOfferedSlotResolution,
   slotDate,
   slotTime,
   slotsEqual,
@@ -83,14 +84,29 @@ const {
   pickReplacementSlots
 } = require("./recruitingConfirmationBookingSafety");
 
-function isPendingOfferedSlotChoice(pendingQ, offeredSlots = []) {
+function isPendingOfferedSlotChoice(pendingQ, offeredSlots = [], context = null) {
+  if (context) {
+    return isActiveOfferedSlotResolution(context);
+  }
   if (!Array.isArray(offeredSlots) || offeredSlots.length === 0) {
     return false;
   }
+  if (pendingQ === "confirm_slot" || pendingQ === "iul_confirm_review_slot") {
+    return false;
+  }
   return (
+    !pendingQ ||
     pendingQ === "offer_time_choices" ||
     pendingQ === "offer_alternatives" ||
-    pendingQ === "offer_available_slots"
+    pendingQ === "offer_available_slots" ||
+    pendingQ === "clarify_offered_slot_time" ||
+    pendingQ === "clarify_offered_slot_day" ||
+    pendingQ === "ask_time_preference" ||
+    pendingQ === "ask_time_after_day_part" ||
+    pendingQ === "ask_time_after_constraint" ||
+    pendingQ === "ask_available_day" ||
+    pendingQ === "ask_day_part" ||
+    pendingQ === "awaiting_availability"
   );
 }
 
@@ -2139,6 +2155,31 @@ function decideConversationTurnCore({
   }
 
   if (intent === INTENTS.SOFT_ACKNOWLEDGEMENT) {
+    // Implements BR-239 — durable offered slots outrank generic soft-ack continue.
+    const offeredForAcceptance = context.appointment?.previouslyOfferedSlots || [];
+    if (isActiveOfferedSlotResolution(context)) {
+      if (offeredForAcceptance.length === 1) {
+        return applySelectedOfferedSlotDecision(
+          structured,
+          offeredForAcceptance[0],
+          offeredForAcceptance,
+          {
+            reasonCodes: [
+              REASON_CODES.OFFERED_SLOT_ACCEPTANCE_SELECTED,
+              REASON_CODES.OFFERED_SLOT_NATURAL_TIME_SELECTED,
+              REASON_CODES.SCHEDULING_HANDOFF_GUARD
+            ],
+            context
+          }
+        );
+      }
+      if (offeredForAcceptance.length > 1) {
+        return applyAskWhichOfferedTime(structured, offeredForAcceptance, {
+          interpretation,
+          reasonCodes: [REASON_CODES.OFFERED_SLOT_ACCEPTANCE_AMBIGUOUS]
+        });
+      }
+    }
     // Implements BR-103 — ok/perfecto while availability pending is not confirmation.
     structured.decision.nextAction = NEXT_ACTIONS.ACKNOWLEDGE_SOFT_CONTINUE;
     structured.decision.shouldEscalate = false;
@@ -3189,7 +3230,7 @@ function decideConversationTurnCore({
     // Do not re-query / broaden unless prospect asks for later alternatives.
     if (
       !requestsLater &&
-      isPendingOfferedSlotChoice(pendingQ, offeredSlots) &&
+      isPendingOfferedSlotChoice(pendingQ, offeredSlots, context) &&
       resolvedDate?.isoDate
     ) {
       const dayMatch = resolveUniqueOfferedDaySelection(
@@ -3534,7 +3575,7 @@ function decideConversationTurnCore({
     const offeredSlots = context.appointment?.previouslyOfferedSlots || [];
 
     // Implements BR-119 — day-part against an active offered menu narrows first.
-    if (isPendingOfferedSlotChoice(pendingQ, offeredSlots) && dayPart) {
+    if (isPendingOfferedSlotChoice(pendingQ, offeredSlots, context) && dayPart) {
       const dayPartMatches = filterOfferedSlotsByDayPart(offeredSlots, dayPart);
       if (dayPartMatches.length === 1) {
         return applySelectedOfferedSlotDecision(
@@ -3724,10 +3765,28 @@ function decideConversationTurnCore({
   }
 
   if (intent === INTENTS.SELECT_OPTION) {
+    // Implements BR-239 — multi-slot bare acceptance must not guess.
+    if (
+      interpretation.entities?.offeredSlotAcceptance === "ambiguous" &&
+      offered.length > 1
+    ) {
+      return applyAskWhichOfferedTime(structured, offered, {
+        interpretation,
+        reasonCodes: [REASON_CODES.OFFERED_SLOT_ACCEPTANCE_AMBIGUOUS]
+      });
+    }
     const optionIndex = Number(interpretation.entities?.optionIndex) || 1;
     const selected =
       offered[Math.max(0, optionIndex - 1)] || offered[0] || null;
+    const acceptanceCodes =
+      interpretation.entities?.offeredSlotAcceptance === "unique"
+        ? [
+            REASON_CODES.OFFERED_SLOT_ACCEPTANCE_SELECTED,
+            REASON_CODES.OFFERED_SLOT_NATURAL_TIME_SELECTED
+          ]
+        : [];
     return applySelectedOfferedSlotDecision(structured, selected, offered, {
+      reasonCodes: acceptanceCodes,
       context
     });
   }
@@ -3873,7 +3932,7 @@ function decideConversationTurnCore({
     }
 
     // Implements BR-115 — unique natural-time match against offered slots = selection.
-    if (isPendingOfferedSlotChoice(pendingQ, offered) && requestedTime) {
+    if (isPendingOfferedSlotChoice(pendingQ, offered, context) && requestedTime) {
       const dateIso =
         interpretation.entities?.resolvedDate?.isoDate ||
         interpretation.entities?.requestedDate?.isoDate ||

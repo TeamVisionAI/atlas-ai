@@ -314,9 +314,221 @@ function isTimeInOfferedSlots(timeHhMm, offeredSlots = []) {
   );
 }
 
+function normalizeOfferedReplyText(text) {
+  return String(text || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[?!¡¿.,;]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const BARE_OFFERED_SLOT_ACCEPTANCE = new Set([
+  "me parece bien",
+  "esta bien",
+  "perfecto",
+  "dale",
+  "ok",
+  "okay",
+  "me sirve",
+  "esa esta bien",
+  "esa hora esta bien",
+  "si",
+  "yes",
+  "de acuerdo",
+  "va",
+  "bien"
+]);
+
 /**
- * BR-115 — match a natural/spoken time against previously offered slots.
+ * BR-239 — acceptance-only reply with no clock. Resolve only against
+ * current durable offered slots; never invent a time.
+ */
+function isBareOfferedSlotAcceptance(text) {
+  return BARE_OFFERED_SLOT_ACCEPTANCE.has(normalizeOfferedReplyText(text));
+}
+
+function isOfferedSlotConfirmationStep(context = {}) {
+  const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+  return lastQ === "confirm_slot" || lastQ === "iul_confirm_review_slot";
+}
+
+/**
+ * BR-239 — current durable `previouslyOfferedSlots` are the source of truth.
+ * Confirmation keeps its own semantics (BR-190).
+ */
+function isActiveOfferedSlotResolution(context = {}) {
+  const offered = context?.appointment?.previouslyOfferedSlots;
+  if (!Array.isArray(offered) || offered.length === 0) {
+    return false;
+  }
+  if (isOfferedSlotConfirmationStep(context)) {
+    return false;
+  }
+  const lastQ = String(context?.conversation?.lastQuestionAsked || "");
+  const stage = String(context?.currentStage || "");
+  const status = String(context?.appointment?.status || "").toLowerCase();
+  if (
+    stage === STAGES.SCHEDULING ||
+    stage === STAGES.PROPOSED ||
+    status === APPOINTMENT_STATUS.PROPOSED ||
+    status === "proposed"
+  ) {
+    return true;
+  }
+  return (
+    !lastQ ||
+    lastQ === "offer_time_choices" ||
+    lastQ === "offer_alternatives" ||
+    lastQ === "offer_available_slots" ||
+    lastQ === "clarify_offered_slot_time" ||
+    lastQ === "clarify_offered_slot_day" ||
+    lastQ === "ask_time_preference" ||
+    lastQ === "ask_time_after_day_part" ||
+    lastQ === "ask_time_after_constraint" ||
+    lastQ === "ask_available_day" ||
+    lastQ === "ask_day_part" ||
+    lastQ === "awaiting_availability"
+  );
+}
+
+const OFFERED_ACCEPTANCE_PREFIX =
+  /^(ok|okay|perfecto|dale|me parece bien|me sirve|esta bien|puede ser|esa de las|la de las|la de|esa de|esa hora|esa)\s+/;
+const OFFERED_ACCEPTANCE_SUFFIX =
+  /\s+(esta bien|me parece bien|me sirve|perfecto|ok|okay|dale)$/;
+
+function stripOfferedAcceptanceWrappers(text) {
+  let remainder = text;
+  for (let i = 0; i < 3; i += 1) {
+    const next = remainder
+      .replace(OFFERED_ACCEPTANCE_PREFIX, "")
+      .replace(OFFERED_ACCEPTANCE_SUFFIX, "")
+      .trim();
+    if (next === remainder) {
+      break;
+    }
+    remainder = next;
+  }
+  return remainder;
+}
+
+/**
+ * BR-239 — extract a spoken clock from acceptance-wrapped replies
+ * ("11:45 está bien", "Ok 4:00", "a las 4"). Returns a token the
+ * offered-slot matcher can resolve; does not invent AM/PM.
+ */
+function extractOfferedReplyClockToken(text) {
+  const normalized = normalizeOfferedReplyText(text);
+  if (!normalized || isBareOfferedSlotAcceptance(normalized)) {
+    return null;
+  }
+  const remainder = stripOfferedAcceptanceWrappers(normalized);
+  const clock = remainder.match(
+    /^(?:a las\s+)?(\d{1,2})(?::(\d{2}))?(?:\s*(a\.?m\.?|p\.?m\.?))?$/
+  );
+  if (!clock) {
+    return null;
+  }
+  const hour = Number(clock[1]);
+  const minute = clock[2] != null ? Number(clock[2]) : 0;
+  if (!Number.isFinite(hour) || hour > 23 || minute > 59) {
+    return null;
+  }
+  let meridiem = null;
+  if (clock[3]) {
+    meridiem = clock[3].replace(/\./g, "").startsWith("p") ? "pm" : "am";
+  }
+  if (meridiem) {
+    let hour24 = hour;
+    if (meridiem === "pm" && hour24 < 12) {
+      hour24 += 12;
+    }
+    if (meridiem === "am" && hour24 === 12) {
+      hour24 = 0;
+    }
+    return `${String(hour24).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+  return `${hour}:${String(minute).padStart(2, "0")}`;
+}
+
+function parseSpokenClockToken(requestedTime) {
+  const token = String(requestedTime || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "");
+  const match = token.match(/^(\d{1,2})(?::(\d{2}))?(a\.?m\.?|p\.?m\.?)?$/);
+  if (!match) {
+    return null;
+  }
+  const hour = Number(match[1]);
+  const minute = match[2] != null ? Number(match[2]) : 0;
+  if (!Number.isFinite(hour) || hour > 23 || minute > 59) {
+    return null;
+  }
+  let meridiem = null;
+  if (match[3]) {
+    meridiem = match[3].replace(/\./g, "").startsWith("p") ? "pm" : "am";
+  }
+  return { hour, minute, meridiem };
+}
+
+function slotMatchesSpokenClock(slot, clock) {
+  const time = String(slotTime(slot) || "");
+  if (!/^\d{2}:\d{2}$/.test(time) || !clock) {
+    return false;
+  }
+  const hour24 = Number(time.slice(0, 2));
+  const minute = Number(time.slice(3, 5));
+  if (minute !== clock.minute) {
+    return false;
+  }
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const slotMeridiem = hour24 >= 12 ? "pm" : "am";
+  const spokenHour12 =
+    clock.hour === 0 ? 12 : clock.hour > 12 ? clock.hour - 12 : clock.hour;
+  if (clock.meridiem) {
+    return hour12 === spokenHour12 && slotMeridiem === clock.meridiem;
+  }
+  return hour12 === spokenHour12;
+}
+
+function finalizeOfferedSlotMatches(matches, dateIso = null) {
+  let narrowed = matches;
+  if (dateIso) {
+    const dateFiltered = matches.filter(
+      (slot) => String(slotDate(slot) || "") === String(dateIso)
+    );
+    if (dateFiltered.length > 0) {
+      narrowed = dateFiltered;
+    }
+  }
+
+  if (narrowed.length === 0) {
+    return { kind: "none", selected: null, matches: [] };
+  }
+
+  if (narrowed.length === 1) {
+    return { kind: "unique", selected: narrowed[0], matches: narrowed };
+  }
+
+  const distinctDates = new Set(
+    narrowed.map((slot) => String(slotDate(slot) || "")).filter(Boolean)
+  );
+  if (distinctDates.size <= 1) {
+    return { kind: "unique", selected: narrowed[0], matches: [narrowed[0]] };
+  }
+
+  return { kind: "ambiguous", selected: null, matches: narrowed };
+}
+
+/**
+ * BR-115 / BR-239 — match a natural/spoken time against previously offered slots.
  * Optional dateIso narrows to one calendar day (e.g. "domingo 7:30").
+ * Offered-slot context resolves AM/PM when exactly one clock matches.
  * @returns {{ kind: 'unique'|'ambiguous'|'none', selected: object|null, matches: object[] }}
  */
 function resolveUniqueOfferedSlotSelection(
@@ -329,37 +541,20 @@ function resolveUniqueOfferedSlotSelection(
   }
 
   const time = String(requestedTime);
-  let matches = offeredSlots.filter(
-    (slot) => String(slotTime(slot) || "") === time
-  );
-
-  if (dateIso) {
-    const dateFiltered = matches.filter(
-      (slot) => String(slotDate(slot) || "") === String(dateIso)
-    );
-    if (dateFiltered.length > 0) {
-      matches = dateFiltered;
-    }
+  const exact = offeredSlots.filter((slot) => String(slotTime(slot) || "") === time);
+  if (exact.length > 0) {
+    return finalizeOfferedSlotMatches(exact, dateIso);
   }
 
-  if (matches.length === 0) {
+  // Implements BR-239 — "4" / "4:00" / "04:00" bind only to offered clocks.
+  const clock = parseSpokenClockToken(requestedTime);
+  if (!clock) {
     return { kind: "none", selected: null, matches: [] };
   }
-
-  if (matches.length === 1) {
-    return { kind: "unique", selected: matches[0], matches };
-  }
-
-  // Same wall time on multiple dates → ambiguous unless date narrows it.
-  const distinctDates = new Set(
-    matches.map((slot) => String(slotDate(slot) || "")).filter(Boolean)
+  const spokenMatches = offeredSlots.filter((slot) =>
+    slotMatchesSpokenClock(slot, clock)
   );
-  if (distinctDates.size <= 1) {
-    // Same date, duplicate times — treat first as unique.
-    return { kind: "unique", selected: matches[0], matches: [matches[0]] };
-  }
-
-  return { kind: "ambiguous", selected: null, matches };
+  return finalizeOfferedSlotMatches(spokenMatches, dateIso);
 }
 
 /**
@@ -445,6 +640,9 @@ module.exports = {
   slotTime,
   slotsEqual,
   isTimeInOfferedSlots,
+  isBareOfferedSlotAcceptance,
+  isActiveOfferedSlotResolution,
+  extractOfferedReplyClockToken,
   resolveUniqueOfferedSlotSelection,
   resolveUniqueOfferedDaySelection,
   filterOfferedSlotsByDayPart,

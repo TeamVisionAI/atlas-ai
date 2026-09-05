@@ -59,7 +59,12 @@ const {
 } = require("./employmentFit");
 const {
   normalizeLanguage,
-  APPOINTMENT_STATUS
+  APPOINTMENT_STATUS,
+  isBareOfferedSlotAcceptance,
+  isActiveOfferedSlotResolution,
+  extractOfferedReplyClockToken,
+  resolveUniqueOfferedSlotSelection,
+  slotTime
 } = require("./conversationContext");
 const {
   parseLocationAnswer,
@@ -912,6 +917,49 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
       requestedTime = resolved.time;
     }
   }
+
+  // Implements BR-239 — resolve acceptance-wrapped clocks against current
+  // durable offered slots only. Never invent a time.
+  const offeredSlots = Array.isArray(context?.appointment?.previouslyOfferedSlots)
+    ? context.appointment.previouslyOfferedSlots
+    : [];
+  const menuIndex = Number(String(originalText || "").trim());
+  const bareMenuSelection =
+    isOptionSelection(originalText) &&
+    offeredSlots.length > 0 &&
+    menuIndex >= 1 &&
+    menuIndex <= offeredSlots.length;
+  if (
+    !availabilityConstraint &&
+    !bareMenuSelection &&
+    isActiveOfferedSlotResolution(context)
+  ) {
+    const clockToken = extractOfferedReplyClockToken(text);
+    const matchToken = clockToken || requestedTime;
+    if (matchToken) {
+      const offeredMatch = resolveUniqueOfferedSlotSelection(
+        offeredSlots,
+        matchToken
+      );
+      if (offeredMatch.kind === "unique" && offeredMatch.selected) {
+        requestedTime = slotTime(offeredMatch.selected);
+        needsAmPmClarification = false;
+        ambiguousHour = null;
+      } else if (offeredMatch.kind === "ambiguous") {
+        requestedTime = matchToken;
+        needsAmPmClarification = false;
+        ambiguousHour = null;
+      } else if (!requestedTime && clockToken) {
+        requestedTime = /^\d{1,2}:\d{2}$/.test(clockToken)
+          ? clockToken.length === 4
+            ? `0${clockToken}`
+            : clockToken
+          : clockToken;
+        needsAmPmClarification = false;
+        ambiguousHour = null;
+      }
+    }
+  }
   const hasTimeEntity = Boolean(requestedTime);
   const dateOnlyProposal =
     !availabilityConstraint &&
@@ -1481,6 +1529,24 @@ function interpretInboundMessage({ message, context, options = {} } = {}) {
   ) {
     intent = INTENTS.SCHEDULE_CONFIRM;
     confidence = 0.9;
+  } else if (
+    // Implements BR-239 — bare acceptance of current durable offered slots.
+    isActiveOfferedSlotResolution(context) &&
+    isBareOfferedSlotAcceptance(text)
+  ) {
+    if (offeredSlots.length === 1) {
+      intent = INTENTS.SELECT_OPTION;
+      confidence = 0.92;
+      entities.optionIndex = 1;
+      entities.requestedTime = slotTime(offeredSlots[0]);
+      entities.offeredSlotAcceptance = "unique";
+    } else {
+      intent = INTENTS.SELECT_OPTION;
+      confidence = 0.9;
+      entities.optionIndex = null;
+      entities.offeredSlotAcceptance = "ambiguous";
+      entities.requiresClarification = true;
+    }
   } else if (
     // Preference captured / availability pending — "ok" / "está bien" is soft ack only.
     isSoftAcknowledgement(text) ||
