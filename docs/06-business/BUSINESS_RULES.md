@@ -3848,6 +3848,29 @@ Coverage is not a `reason`. Use `coverageResult`: `COVERAGE_LOCAL`, `COVERAGE_OU
 
 ---
 
+## BR-238 — Spanish pending-answer aliases (yes / daypart / optional unknown)
+
+**Implements:** While a pending WhatsApp question is known, natural Spanish short answers resolve that question only. Colloquial yes (`sip`, `sipi`, `ajá`) authorizes pending yes/no. Plural day-part (`en las tardes`) is afternoon. Optional IUL carrier “I don’t know / no” answers the question with unknown/null and advances — never persist those phrases as a company name.  
+**Domain:** Recruit AI v2 / IUL discovery / inbound interpretation  
+**Depends on:** BR-095, BR-101, BR-195, BR-224, BR-229  
+**Related:** BR-083, BR-143, BR-209  
+**Status:** Implemented  
+**Engine target:** `languageLibrary.isBareConversationalYes`; `interpreter.parseDayPart`; `iulAdConversation.parseIulReviewDayPart`; `iulDiscoveryFacts.classifyCarrier` / `looksLikeOptionalUnknown`  
+**Tests:** `backend/test/recruitAiV2SpanishAnswerNormalizationBr238.test.js`
+
+### Rules
+
+1. **Pending-context only** — Aliases apply to the pending question. Do not invent work authorization, day-part, or carrier from stray tokens on another ask.
+2. **Yes atoms (pending yes/no)** — Whole tokens only: `sí`, `si`, `sip`, `sipi`, `claro`, `correcto`, `afirmativo`, `ajá` / `aja`, `por supuesto`, plus existing English yes atoms. Do not match `sip` inside longer non-yes phrases.
+3. **Day-part** — `mañana` / `en la mañana` / `por la mañana` / `temprano` → morning. `tarde` / `en la tarde` / `en las tardes` / `por la tarde` / `por las tardes` → afternoon. `noche` / `en la noche` / `por la noche` → evening. Do not change offered-slot or availability windows.
+4. **Optional unknown (IUL carrier)** — Exact `No`, `No sé`, `nose`, `No recuerdo`, `No me acuerdo`, `Ni idea`, `No estoy seguro/a` → `carrier=null`, `carrierResolved=true`, advance. Do not store those strings as `carrier`.
+5. **Required yes/no stays required** — Pending work authorization `No` remains not-authorized (BR-224). Bare `No` is not a global unknown.
+6. **No fuzzy matching** — Do not treat arbitrary text that merely contains `no` as unknown.
+7. **Boundaries** — Do not change conversation locks, HUMAN ownership, location parsing, coverage, booking, or campaign eligibility.
+
+
+---
+
 ## BR-227 — AI Quality Evidence Integrity + Approval Safety
 
 **Implements:** AI Quality cases and learning proposals must be grounded in recoverable, review-safe conversation evidence. Generate Proposal may run on a weak case; Approve Regression cannot be recommended or persisted from catalog-only or empty evidence.  

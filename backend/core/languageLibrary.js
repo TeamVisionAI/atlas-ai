@@ -114,8 +114,10 @@ function isBareConversationalYes(text) {
   }
   // Implements BR-229 — stacked affirmatives ("si claro", "yes sure") are still yes.
   // Do not match "si miami" / "yes orlando": every token must be a yes-atom or courtesy.
+  // Implements BR-238 — colloquial Spanish yes (sip/sipi/aja) only as whole
+  // yes-atoms. Longer sipi before sip before si so prefixes do not split.
   const yesAtom =
-    "(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|si|claro|por supuesto|correcto|asi es|afirmativo|of course|thats right|that is right|affirmative)";
+    "(ok|okay|yes|yep|yeah|sure|sounds good|that works|perfect|sipi|sip|si|claro|por supuesto|correcto|asi es|afirmativo|aja|of course|thats right|that is right|affirmative)";
   const courtesy = "(senor|senora|senorita|senores|sir|maam|ma am|please)";
   const tail = "(que si)";
   return new RegExp(

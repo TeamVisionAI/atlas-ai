@@ -741,7 +741,7 @@ function parseDayPart(text) {
   // Implements BR-101 — "en la mañana" / "por la mañana" are morning day-part,
   // not date-tomorrow when ask_day_part is pending.
   if (
-    /^(morning|manana|por la manana|en la manana|a la manana|in the morning|1)$/.test(
+    /^(morning|manana|por la manana|en la manana|a la manana|temprano|in the morning|1)$/.test(
       t
     ) ||
     /\b(por la manana|en la manana|a la manana|in the morning)\b/.test(t)
@@ -749,12 +749,20 @@ function parseDayPart(text) {
     return { dayPart: "morning", complete: true };
   }
   if (
-    /^(afternoon|evening|tarde|por la tarde|en la tarde|in the afternoon|2)$/.test(
+    /^(afternoon|evening|tarde|tardes|por la tarde|por las tardes|en la tarde|en las tardes|in the afternoon|2)$/.test(
       t
     ) ||
-    /\b(afternoon|evening|por la tarde|en la tarde)\b/.test(t)
+    /\b(afternoon|evening|por las tardes|en las tardes|por la tarde|en la tarde)\b/.test(t)
   ) {
     return { dayPart: "afternoon", complete: true };
+  }
+  // Implements BR-238 — noche is evening. Existing English "evening" stays
+  // afternoon above to preserve recruiting scheduling semantics.
+  if (
+    /^(noche|en la noche|por la noche|in the evening|at night)$/.test(t) ||
+    /\b(en la noche|por la noche)\b/.test(t)
+  ) {
+    return { dayPart: "evening", complete: true };
   }
 
   // Incomplete / typo fragments toward day-part.

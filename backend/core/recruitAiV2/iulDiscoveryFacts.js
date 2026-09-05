@@ -58,15 +58,28 @@ function looksLikeUnknown(text) {
   const t = fold(text);
   return (
     !t ||
-    /^(no se|nose|no lo se|no estoy seguro|no estoy segura|no tengo idea|unsure|not sure|i don'?t know|idk|no idea|no lo tengo|no tengo)$/.test(
+    /^(no se|nose|no lo se|no recuerdo|no me acuerdo|ni idea|no tengo idea|no estoy seguro|no estoy segura|unsure|not sure|i don'?t know|idk|no idea|no lo tengo|no tengo)$/.test(
       t
     ) ||
     /\bno (lo )?se\b/.test(t) ||
+    /\bno recuerdo\b/.test(t) ||
+    /\bno me acuerdo\b/.test(t) ||
+    /\bni idea\b/.test(t) ||
     /\bno estoy segur[oa]\b/.test(t) ||
     /\bnot sure\b/.test(t) ||
     /\bi don'?t know\b/.test(t) ||
     /\bno (la )?tengo\b/.test(t)
   );
+}
+
+/**
+ * Optional-info unknown — pending IUL carrier only.
+ * Bare "no" means "I don't know the company", not a carrier named "No".
+ * Do not use this for required yes/no questions (work authorization).
+ */
+function looksLikeOptionalUnknown(text) {
+  const t = fold(text);
+  return t === "no" || looksLikeUnknown(text);
 }
 
 function classifyPolicyType(text) {
@@ -105,8 +118,8 @@ function classifyCarrier(text) {
   if (!t) {
     return { carrier: null, carrierRaw: null, resolved: false };
   }
-  if (looksLikeUnknown(text)) {
-    return { carrier: null, carrierRaw: raw, resolved: true };
+  if (looksLikeOptionalUnknown(text)) {
+    return { carrier: null, carrierRaw: null, resolved: true };
   }
   const known = [
     { pattern: /\bprimerica\b/, name: "Primerica" },
@@ -293,6 +306,8 @@ module.exports = {
   classifyPolicyAgeRange,
   classifyReviewReason,
   classifyDocumentsAvailable,
+  looksLikeUnknown,
+  looksLikeOptionalUnknown,
   looksLikePolicyIsBadQuestion,
   isDiscoveryComplete
 };
