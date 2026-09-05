@@ -3893,6 +3893,42 @@ Coverage is not a `reason`. Use `coverageResult`: `COVERAGE_LOCAL`, `COVERAGE_OU
 
 ---
 
+## BR-240 — Admin-only reusable canary reset
+
+**Implements:** SUPER_ADMIN may reset an explicitly marked TEST/canary prospect so the same dedicated phone can run a new IUL/recruiting canary. History is preserved. Atlas must stay silent until a fresh legitimate intake/CTWA/QR event.  
+**Domain:** Platform / Conversations / inbound eligibility  
+**Depends on:** BR-135 (durable workflow_state + `inboxMarkedTestAt`), BR-142, BR-147, BR-237  
+**Related:** BR-081 (durable Recruit V2 context archive), BR-222 (fresh IUL episode)  
+**Status:** Implemented  
+**Engine target:** `canaryResetService.js`; `evaluateAtlasInboundAutomationEligibility`; Conversations `Reset Canary`  
+**Tests:** `backend/test/canaryResetBr240.test.js`
+
+### Rules
+
+1. **Authorization** — SUPER_ADMIN only. Fail closed for ADMIN / RVP / REP / others. Require explicit `organizationId` + `prospectId` + `resetReason`. Dedicated service/API (`POST /api/platform/canary-reset`), not UI SQL.
+2. **Test marker** — Reset only if `workflow_state.inboxMarkedTestAt` is already set (Conversations “Mark as test”). Knowing a production prospect id is not enough.
+3. **Preserve** — Keep the prospect row and identity (name, phone, org, prospect number). Do not delete messages, conversation logs, appointments, Calendar events, campaign history, HUMAN takeover history, or prior audit events.
+4. **Clear only blocking runtime state** — Archive the active Recruit V2 context (history rows remain). Clear current HUMAN/AGENT seal, stale eligibility stamps, IUL discovery/progression extras, proposed slots, inbound dedupe keys, and attention from the prior canary. Do not set `returnedToAtlasAt` or resume keys.
+5. **Fresh eligibility** — After reset set `canaryAwaitingFreshIntake: true`. Stored `CAMPAIGN_INTAKE_IUL` / verified origin must not authorize Atlas. A new CTWA, QR, or campaign-intake event on that inbound is required. Persist of a new verified source clears the awaiting flag. Reset itself sends no WhatsApp, creates no appointment, creates no Calendar event, and does not author Recruit/IUL.
+6. **Audit** — Write `CANARY_RESET` to `atlas_audit_log` (plus structured stage log) with prospect, org, actor, reason, mode, timestamp, and previous ownership/eligibility summary. Repeat resets are idempotent and may audit each attempt.
+7. **Boundaries** — Do not weaken BR-147, BR-237, HUMAN ownership, campaign/WhatsApp eligibility, scheduling, reminders, or city parsing except this narrow awaiting-fresh-intake gate.
+
+### Invoke
+
+`POST /api/platform/canary-reset` as SUPER_ADMIN:
+
+```json
+{
+  "organizationId": "00000000-0000-4000-8000-000000000001",
+  "prospectId": "<prospect uuid>",
+  "resetReason": "Reusable IUL canary for +17867527481"
+}
+```
+
+Team Vision TV-000030 must be Marked as test first. Then Reset Canary on Conversations (Test filter) or the API above. Then send a fresh valid IUL intake/entry event.
+
+---
+
 ## BR-227 — AI Quality Evidence Integrity + Approval Safety
 
 **Implements:** AI Quality cases and learning proposals must be grounded in recoverable, review-safe conversation evidence. Generate Proposal may run on a weak case; Approve Regression cannot be recommended or persisted from catalog-only or empty evidence.  

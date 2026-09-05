@@ -77,6 +77,7 @@ import {
   resolveConversationsSupportView,
   resolveConversationsWorkspaceTab
 } from "../engines/conversationsWorkspaceScope";
+import { resetCanaryProspect } from "../services/platformService";
 import "./ConversationsPage.css";
 
 const FILTERS = [
@@ -295,6 +296,8 @@ export default function ConversationsPage() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const [canaryResetOpen, setCanaryResetOpen] = useState(false);
+  const [canaryResetReason, setCanaryResetReason] = useState("");
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [phoneCopyStatus, setPhoneCopyStatus] = useState(null);
   const [newMessageCount, setNewMessageCount] = useState(0);
@@ -945,6 +948,30 @@ export default function ConversationsPage() {
     }
   }
 
+  async function onConfirmCanaryReset() {
+    const organizationId = supportMode?.organizationId || user?.organizationId || "";
+    const reason = String(canaryResetReason || "").trim();
+    if (!timelineProspectId || !organizationId || reason.length < 3 || actionBusy) {
+      return;
+    }
+    setActionBusy(true);
+    try {
+      await resetCanaryProspect({
+        organizationId,
+        prospectId: timelineProspectId,
+        resetReason: reason
+      });
+      setCanaryResetOpen(false);
+      setCanaryResetReason("");
+      await loadList();
+      setRefreshSignal((n) => n + 1);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
   async function onClose(reason) {
     if (!selectedPhone || actionBusy || supportReadOnly) return;
     setActionBusy(true);
@@ -1406,6 +1433,22 @@ export default function ConversationsPage() {
                           {translate("conversationsMarkTest")}
                         </AtlasButton>
                       ) : null}
+                      {isSuperAdminUser(user) &&
+                      inboxLifecycle === "TEST" &&
+                      timelineProspectId &&
+                      (supportMode?.organizationId || user?.organizationId) ? (
+                        <AtlasButton
+                          variant="secondary"
+                          data-testid="conversations-reset-canary"
+                          disabled={actionBusy}
+                          onClick={() => {
+                            setCanaryResetReason("");
+                            setCanaryResetOpen(true);
+                          }}
+                        >
+                          {translate("conversationsResetCanary")}
+                        </AtlasButton>
+                      ) : null}
                       {allowSupportMutations && lifecycleActionIds.includes("RESTORE") ? (
                         <AtlasButton
                           variant="primary"
@@ -1418,6 +1461,77 @@ export default function ConversationsPage() {
                       ) : null}
                     </div>
                   </div>
+                  {canaryResetOpen ? (
+                    <div
+                      className="conversations-canary-reset"
+                      data-testid="conversations-canary-reset-dialog"
+                    >
+                      <p className="conversations-canary-reset__title">
+                        {translate("conversationsResetCanaryTitle")}
+                      </p>
+                      <dl className="conversations-canary-reset__facts">
+                        <div>
+                          <dt>{translate("conversationsResetCanaryName")}</dt>
+                          <dd>
+                            {headerModel.displayIdentity ||
+                              headerModel.name ||
+                              "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{translate("conversationsResetCanaryPhone")}</dt>
+                          <dd>{headerModel.phone || selectedPhone || "—"}</dd>
+                        </div>
+                        <div>
+                          <dt>{translate("conversationsResetCanaryOrg")}</dt>
+                          <dd>
+                            {supportMode?.organizationId ||
+                              user?.organizationId ||
+                              "—"}
+                          </dd>
+                        </div>
+                      </dl>
+                      <p className="conversations-canary-reset__warning">
+                        {translate("conversationsResetCanaryWarning")}
+                      </p>
+                      <label className="conversations-canary-reset__reason">
+                        {translate("conversationsResetCanaryReason")}
+                        <textarea
+                          data-testid="conversations-canary-reset-reason"
+                          value={canaryResetReason}
+                          onChange={(event) =>
+                            setCanaryResetReason(event.target.value)
+                          }
+                          rows={3}
+                          disabled={actionBusy}
+                        />
+                      </label>
+                      <div className="conversations-canary-reset__actions">
+                        <AtlasButton
+                          variant="secondary"
+                          data-testid="conversations-canary-reset-cancel"
+                          disabled={actionBusy}
+                          onClick={() => {
+                            setCanaryResetOpen(false);
+                            setCanaryResetReason("");
+                          }}
+                        >
+                          {translate("conversationsResetCanaryCancel")}
+                        </AtlasButton>
+                        <AtlasButton
+                          variant="primary"
+                          data-testid="conversations-canary-reset-confirm"
+                          disabled={
+                            actionBusy ||
+                            String(canaryResetReason || "").trim().length < 3
+                          }
+                          onClick={onConfirmCanaryReset}
+                        >
+                          {translate("conversationsResetCanaryConfirm")}
+                        </AtlasButton>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div
